@@ -62,12 +62,10 @@ typeset disk2=$(create_blockfile $FILESIZE)
 
 pooldevs="${DISK0} \
 	\"${DISK0} ${DISK1}\" \
-	\"${DISK0} ${DISK1} ${DISK2}\" \
-	\"$disk1 $disk2\""
+	\"${DISK0} ${DISK1} ${DISK2}\""
 raidzdevs="\"${DISK0} ${DISK1} ${DISK2}\""
 mirrordevs="\"${DISK0} ${DISK1}\" \
-	$raidzdevs \
-	\"$disk1 $disk2\""
+	$raidzdevs"
 
 create_pool_test "$TESTPOOL" "" "$pooldevs"
 create_pool_test "$TESTPOOL" "mirror" "$mirrordevs"

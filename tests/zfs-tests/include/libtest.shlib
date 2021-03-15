@@ -81,13 +81,22 @@ function linux_version
 	echo $((version * 10000 + major * 100 + minor))
 }
 
+function is_windows
+{
+	if [[ $UNAME == "windows" ]]; then
+		return 0
+	else
+		return 1
+	fi
+}
+
 # Determine if this is a Linux test system
 #
 # Return 0 if platform Linux, 1 if otherwise
 
 function is_linux
 {
-	if [[ $(uname -o) == "GNU/Linux" ]]; then
+	if [[ $UNAME == "Linux" ]]; then
 		return 0
 	else
 		return 1
@@ -1685,7 +1694,7 @@ function setup_nfs_server
 #
 function is_global_zone
 {
-	if is_linux || is_freebsd; then
+	if is_linux || is_freebsd || is_windows; then
 		return 0
 	else
 		typeset cur_zone=$(zonename 2>/dev/null)
@@ -2415,9 +2424,9 @@ function cleanup_devices #vdevs
 {
 	typeset pool="foopool$$"
 
-	for vdev in $@; do
-		zero_partitions $vdev
-	done
+#	for vdev in $@; do
+#		zero_partitions $vdev
+#	done
 
 	poolexists $pool && destroy_pool $pool
 	create_pool $pool $@
@@ -2439,7 +2448,7 @@ function cleanup_devices #vdevs
 function find_disks
 {
 	# Trust provided list, no attempt is made to locate unused devices.
-	if is_linux || is_freebsd; then
+	if is_linux || is_freebsd || is_windows; then
 		echo "$@"
 		return
 	fi
@@ -4025,13 +4034,18 @@ function sha256digest
 
 function new_fs #<args>
 {
-	case $(uname) in
+	case $UNAME in
 	FreeBSD)
 		newfs "$@"
 		;;
 	*)
 		echo y | newfs -v "$@"
 		;;
+#	windows)
+#		wzvol=`/mnt/c/Windows/System32/wbem/WMIC.exe diskdrive list brief| grep "OpenZFS WinZVOL SCSI Disk Device" | awk {'print $6'}`
+#		/mnt/c/Windows/System32/wsl.exe	--mount  $wzvol	 --bare
+#		wdisk=`lsblk | tail -1| awk {'print $1'}`
+#		mkfs.ext4 /dev/$wdisk
 	esac
 }
 

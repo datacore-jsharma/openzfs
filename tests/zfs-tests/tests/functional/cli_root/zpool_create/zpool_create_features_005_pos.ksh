@@ -76,8 +76,7 @@ log_onexit cleanup
 set -A features \
     "hole_birth" \
     "large_blocks"  \
-    "large_dnode" \
-    "userobj_accounting"
+    "large_dnode"
 
 typeset -i i=0
 while (( $i < ${#features[*]} )); do

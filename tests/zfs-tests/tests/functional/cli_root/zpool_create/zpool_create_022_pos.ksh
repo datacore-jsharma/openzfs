@@ -62,13 +62,13 @@ set -A RW_FS_PROP "quota=536870912" \
 		  "mountpoint=/tmp/mnt$$" \
 		  "checksum=fletcher2" \
 		  "compression=lzjb" \
-		  "atime=off" \
+		  #"atime=off" \
 		  "devices=off" \
 		  "exec=off" \
 		  "setuid=off" \
 		  "readonly=on" \
 		  "snapdir=visible" \
-		  "acltype=posix" \
+		  #"acltype=posix" \
 		  "aclinherit=discard" \
 		  "canmount=off"
 
