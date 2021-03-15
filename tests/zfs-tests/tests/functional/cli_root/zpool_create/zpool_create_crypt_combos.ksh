@@ -48,7 +48,7 @@ set -A ENCRYPTION_ALGS "encryption=on" \
 	"encryption=aes-192-gcm" \
 	"encryption=aes-256-gcm"
 
-set -A ENCRYPTION_PROPS "encryption=aes-256-gcm" \
+set -A ENCRYPTION_PROPS "encryption=aes-256-ccm" \
 	"encryption=aes-128-ccm" \
 	"encryption=aes-192-ccm" \
 	"encryption=aes-256-ccm" \
@@ -60,7 +60,7 @@ set -A KEYFORMATS "keyformat=raw" \
 	"keyformat=hex" \
 	"keyformat=passphrase"
 
-set -A USER_KEYS "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz" \
+set -A USER_KEYS "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz" \
 	"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" \
 	"abcdefgh"
 
@@ -71,10 +71,9 @@ typeset -i i=0
 while (( i < ${#ENCRYPTION_ALGS[*]} )); do
 	typeset -i j=0
 	while (( j < ${#KEYFORMATS[*]} )); do
-		log_must eval "printf '%s' ${USER_KEYS[j]} | zpool create" \
+		log_must eval "echo ${USER_KEYS[j]} | zpool create" \
 		"-O ${ENCRYPTION_ALGS[i]} -O ${KEYFORMATS[j]}" \
 		"$TESTPOOL $DISKS"
-
 		propertycheck $TESTPOOL ${ENCRYPTION_PROPS[i]} || \
 			log_fail "failed to set ${ENCRYPTION_ALGS[i]}"
 		propertycheck $TESTPOOL ${KEYFORMATS[j]} || \

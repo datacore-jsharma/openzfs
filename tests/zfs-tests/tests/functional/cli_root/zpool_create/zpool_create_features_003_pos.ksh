@@ -54,7 +54,7 @@ log_assert "'zpool create -d -o feature@async_destroy=enabled' only " \
 
 log_must zpool create -f -d -o feature@async_destroy=enabled $TESTPOOL $DISKS
 
-state=$(zpool list -Ho feature@async_destroy $TESTPOOL)
+state=$(zpool list -Ho feature@async_destroy $TESTPOOL | sed -e "s/\r//g")
 if [[ "$state" != "enabled" ]]; then
 	log_fail "async_destroy has state $state"
 fi
