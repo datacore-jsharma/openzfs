@@ -50,7 +50,6 @@ log_assert "Verify ZIL functionality on ZVOLs"
 log_onexit cleanup
 
 ZVOL="$TESTPOOL/vol"
-ZDEV="$ZVOL_DEVDIR/$ZVOL"
 typeset -a logbias_prop_vals=('latency' 'throughput')
 typeset -a sync_prop_vals=('standard' 'always' 'disabled')
 
@@ -60,6 +59,8 @@ for logbias in ${logbias_prop_vals[@]}; do
 		log_must zfs create -V $VOLSIZE -b 128K -o sync=$sync \
 		    -o logbias=$logbias $ZVOL
 
+		mount_win_zvol
+		ZDEV=$(win_zvol)
 		# 2. Write data to its device node
 		for i in {1..50}; do
 			dd if=/dev/zero of=$ZDEV bs=8k count=1 &
@@ -67,6 +68,7 @@ for logbias in ${logbias_prop_vals[@]}; do
 
 		# 3. Verify we don't trigger any issue
 		log_must wait
+		unmount_win_zvol
 		log_must_busy zfs destroy $ZVOL
 	done
 done

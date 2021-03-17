@@ -39,6 +39,7 @@ ismounted $TESTDIR $NEWFS_DEFAULT_FS
 
 [[ -e $TESTDIR ]] && rm -rf $TESTDIR
 
+unmount_win_zvol
 default_zvol_cleanup
 
 log_pass

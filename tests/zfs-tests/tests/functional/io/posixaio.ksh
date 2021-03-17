@@ -42,6 +42,7 @@ verify_runnable "global"
 function cleanup
 {
 	log_must rm -f "$mntpnt/rw*"
+	unmount_win_zvol "/$TESTPOOL/$TESTFS"
 }
 
 log_assert "Verify POSIX asynchronous IO with aio_read(3) and aio_write(3)"
@@ -49,8 +50,11 @@ log_assert "Verify POSIX asynchronous IO with aio_read(3) and aio_write(3)"
 log_onexit cleanup
 
 ioengine="--ioengine=posixaio"
-mntpnt=$(get_prop mountpoint $TESTPOOL/$TESTFS)
-dir="--directory=$mntpnt"
+#mntpnt=$(get_prop mountpoint $TESTPOOL/$TESTFS)
+#dir="--directory=$mntpnt"
+mount_win_zvol "/$TESTPOOL/$TESTFS"
+mntpnt=/$TESTPOOL/$TESTFS
+dir="--directory=/$TESTPOOL/$TESTFS"
 
 set -A fio_arg -- "--sync=0" "--sync=1" "--direct=0" "--direct=1"
 
@@ -62,4 +66,5 @@ for arg in "${fio_arg[@]}"; do
 	log_must rm -f "$mntpnt/rw*"
 done
 
+unmount_win_zvol "/$TESTPOOL/$TESTFS"
 log_pass "Verified POSIX asynchronous IO with aio_read(3) and aio_write(3)"

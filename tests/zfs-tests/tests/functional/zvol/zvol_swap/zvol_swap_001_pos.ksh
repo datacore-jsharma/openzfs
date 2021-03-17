@@ -53,13 +53,15 @@ function cleanup
 	if is_swap_inuse $voldev ; then
 		log_must swap_cleanup $voldev
 	fi
+	unmount_win_zvol
 }
 
 log_assert "Verify that a zvol can be used as a swap device"
 
 log_onexit cleanup
 
-voldev=${ZVOL_DEVDIR}/$TESTPOOL/$TESTVOL
+mount_win_zvol
+voldev=$(win_zvol)
 log_note "Add zvol volume as swap space"
 log_must swap_setup $voldev
 

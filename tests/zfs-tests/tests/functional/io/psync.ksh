@@ -42,6 +42,7 @@ verify_runnable "global"
 function cleanup
 {
 	log_must rm -f "/$TESTPOOL/rw*"
+	unmount_win_zvol "/$TESTPOOL/$TESTFS"
 }
 
 log_assert "Verify basic pread(2), pwrite(2)"
@@ -49,8 +50,12 @@ log_assert "Verify basic pread(2), pwrite(2)"
 log_onexit cleanup
 
 ioengine="--ioengine=psync"
-mntpnt=$(get_prop mountpoint $TESTPOOL/$TESTFS)
-dir="--directory=$mntpnt"
+#mntpnt=$(get_prop mountpoint $TESTPOOL/$TESTFS)
+#dir="--directory=$mntpnt"
+
+mount_win_zvol "/$TESTPOOL/$TESTFS"
+mntpnt=/$TESTPOOL/$TESTFS
+dir="--directory=/$TESTPOOL/$TESTFS"
 
 set -A fio_arg -- "--sync=0" "--sync=1" "--direct=0" "--direct=1"
 
@@ -62,4 +67,5 @@ for arg in "${fio_arg[@]}"; do
 	log_must rm -f "$mntpnt/rw*"
 done
 
+unmount_win_zvol "/$TESTPOOL/$TESTFS"
 log_pass "Verified basic pread(2), pwrite(2)"
