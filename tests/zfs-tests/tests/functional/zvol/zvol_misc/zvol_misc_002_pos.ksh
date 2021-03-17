@@ -54,6 +54,7 @@ function cleanup
 	ismounted $TESTDIR $NEWFS_DEFAULT_FS
 	(( $? == 0 )) && log_must umount $TESTDIR
 
+	unmount_win_zvol
 	zfs set volsize=$volsize $TESTPOOL/$TESTVOL
 }
 
@@ -67,8 +68,8 @@ NUM_WRITES=40
 log_must zfs set volsize=128m $TESTPOOL/$TESTVOL
 
 log_must new_fs ${ZVOL_RDEVDIR}/$TESTPOOL/$TESTVOL
-
-log_must mount ${ZVOL_DEVDIR}/$TESTPOOL/$TESTVOL $TESTDIR
+wdisk=/dev/`lsblk | tail -1| awk {'print $1'}`
+log_must mount $wdisk $TESTDIR
 
 typeset -i fn=0
 typeset -i retval=0
@@ -92,8 +93,9 @@ fi
 log_must zfs set snapdev=visible $TESTPOOL/$TESTVOL
 log_must zfs snapshot $TESTPOOL/$TESTVOL@snap
 block_device_wait
-
-fsck -n ${ZVOL_RDEVDIR}/$TESTPOOL/$TESTVOL@snap >/dev/null 2>&1
+snap_disk=/dev/`lsblk | tail -1| awk {'print $1'}`
+fsck -n $snap_disk
+#fsck -n ${ZVOL_RDEVDIR}/$TESTPOOL/$TESTVOL@snap >/dev/null 2>&1
 retval=$?
 
 if [ $retval -ne 0 ] ; then

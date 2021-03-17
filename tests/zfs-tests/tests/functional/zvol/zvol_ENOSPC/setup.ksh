@@ -36,15 +36,19 @@
 verify_runnable "global"
 
 DISK=${DISKS%% *}
-if is_mpath_device $DISK; then
-	delete_partitions
-fi
-
+#if is_mpath_device $DISK; then
+#	delete_partitions
+#fi
 default_zvol_setup $DISK $VOLSIZE $BLOCKSIZE
 
 log_must new_fs ${ZVOL_RDEVDIR}/$TESTPOOL/$TESTVOL
 
 log_must mkdir $TESTDIR
-log_must mount ${ZVOL_DEVDIR}/$TESTPOOL/$TESTVOL $TESTDIR
+if [ $UNAME != "windows"]; then
+	log_must mount ${ZVOL_DEVDIR}/$TESTPOOL/$TESTVOL $TESTDIR
+else
+	wdisk=$(win_zvol)
+	log_must mount $wdisk $TESTDIR
+fi
 
 log_pass

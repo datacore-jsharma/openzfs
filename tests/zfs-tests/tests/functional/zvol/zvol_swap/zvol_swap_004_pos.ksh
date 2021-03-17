@@ -47,6 +47,7 @@ verify_runnable "global"
 function cleanup
 {
 	is_swap_inuse $swapname && log_must swap_cleanup $swapname
+	unmount_win_zvol
 	datasetexists $vol && log_must zfs destroy $vol
 }
 
@@ -58,17 +59,19 @@ for vbs in 8192 16384 32768 65536 131072; do
 	for multiplier in 32 16384 131072; do
 		((volsize = vbs * multiplier))
 		vol="$TESTPOOL/vol_$volsize"
-		swapname="${ZVOL_DEVDIR}/$vol"
 
 		# Create a sparse volume to test larger sizes
 		log_must zfs create -s -b $vbs -V $volsize $vol
 		block_device_wait
+		mount_win_zvol
+		swapname=$(win_zvol)
 		log_must swap_setup $swapname
 
 		new_volsize=$(get_prop volsize $vol)
 		[[ $volsize -eq $new_volsize ]] || log_fail "$volsize $new_volsize"
 
 		log_must swap_cleanup $swapname
+		unmount_win_zvol
 		log_must_busy zfs destroy $vol
 	done
 done

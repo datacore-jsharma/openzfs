@@ -42,6 +42,7 @@ verify_runnable "global"
 function cleanup
 {
 	log_must rm -f "$mntpnt/rw*"
+	unmount_win_zvol "/$TESTPOOL/$TESTFS"
 }
 
 log_assert "Verify basic read(2), write(2) and lseek(2)"
@@ -49,8 +50,10 @@ log_assert "Verify basic read(2), write(2) and lseek(2)"
 log_onexit cleanup
 
 ioengine="--ioengine=sync"
-mntpnt=$(get_prop mountpoint $TESTPOOL/$TESTFS)
-dir="--directory=$mntpnt"
+mount_win_zvol "/$TESTPOOL/$TESTFS"
+#mntpnt=$(get_prop mountpoint $TESTPOOL/$TESTFS)
+mntpnt=/$TESTPOOL/$TESTFS
+dir="--directory=/$TESTPOOL/$TESTFS"
 
 set -A fio_arg -- "--sync=0" "--sync=1" "--direct=0" "--direct=1"
 
@@ -61,5 +64,5 @@ for arg in ${fio_arg[@]}; do
 	log_must fio $dir $ioengine $arg $FIO_RANDREAD_ARGS
 	log_must rm -f "$mntpnt/rw*"
 done
-
+unmount_win_zvol "/$TESTPOOL/$TESTFS"
 log_pass "Verified basic read(2), write(2) and lseek(2)"

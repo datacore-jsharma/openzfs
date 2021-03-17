@@ -1,0 +1,48 @@
+#
+# This file and its contents are supplied under the terms of the
+# Common Development and Distribution License ("CDDL"), version 1.0.
+# You may only use this file in accordance with the terms of version
+# 1.0 of the CDDL.
+#
+# A full copy of the text of the CDDL should have accompanied this
+# source.  A copy of the CDDL is also available via the Internet at
+# http://www.illumos.org/license/CDDL.
+#
+
+[DEFAULT]
+pre = setup
+quiet = False
+pre_user = root
+user = root
+timeout = 600
+post_user = root
+post = cleanup
+failsafe_user = root
+failsafe = callbacks/zfs_failsafe
+outputdir = /var/tmp/test_results
+tags = ['functional']
+
+[tests/functional/cli_root/zpool_create]
+tests = ['zpool_create_001_pos', 'zpool_create_007_neg',
+    'zpool_create_009_neg', 'zpool_create_011_neg',
+    'zpool_create_012_neg',
+    'zpool_create_017_neg','zpool_create_019_pos',
+    'zpool_create_021_pos', 'zpool_create_022_pos',
+    'zpool_create_023_neg',
+    'zpool_create_encrypted', 'zpool_create_crypt_combos',
+    'zpool_create_features_001_pos',
+    'zpool_create_features_004_neg',
+    'zpool_create_features_005_pos']
+tags = ['functional', 'cli_root', 'zpool_create']
+
+[tests/functional/zvol/zvol_cli]
+tests = ['zvol_cli_001_pos', 'zvol_cli_002_pos', 'zvol_cli_003_neg']
+tags = ['functional', 'zvol', 'zvol_cli']
+
+[tests/functional/zvol/zvol_misc]
+tests = ['zvol_misc_002_pos', 'zvol_misc_zil']
+tags = ['functional', 'zvol', 'zvol_misc']
+
+[tests/functional/io]
+tests = ['sync', 'psync', 'posixaio', 'mmap']
+tags = ['functional', 'io']

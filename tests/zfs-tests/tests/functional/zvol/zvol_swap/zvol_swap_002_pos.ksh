@@ -52,14 +52,16 @@ function cleanup
 	if is_swap_inuse $swapdev ; then
 		log_must swap_cleanup $swapdev
 	fi
+	unmount_win_zvol
 }
 
 log_assert "Using a zvol as swap space, fill /var/tmp to 80%."
 
 log_onexit cleanup
 
+mount_win_zvol
 vol=$TESTPOOL/$TESTVOL
-swapdev=${ZVOL_DEVDIR}/$vol
+swapdev=$(win_zvol)
 log_must swap_setup $swapdev
 
 # Get 80% of the number of 512 blocks in the zvol
@@ -72,5 +74,6 @@ log_note "Fill 80% of swap"
 log_must dd if=/dev/urandom of=$TEMPFILE bs=1048576 count=$count
 log_must rm -f $TEMPFILE
 log_must swap_cleanup $swapdev
+unmount_win_zvol
 
 log_pass "Using a zvol as swap space, fill /var/tmp to 80%."
