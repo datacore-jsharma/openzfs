@@ -103,8 +103,9 @@ arguments[${#arguments[@]}]="bootfs=$bigname"
 # Create a pool called bootfs (so-called, so as to trip any clashes between
 # property name, and pool name)
 # Also create a filesystem in this pool
-FILEVDEV="$TEST_BASE_DIR/zpool_set_002.$$.dat"
-log_must mkfile $MINVDEVSIZE $FILEVDEV
+#FILEVDEV="$TEST_BASE_DIR/zpool_set_002.$$.dat"
+FILEVDEV=$(echo $DISKS | awk '{print $2}')
+#log_must mkfile $MINVDEVSIZE $FILEVDEV
 log_must zpool create bootfs $FILEVDEV
 log_must zfs create bootfs/root
 

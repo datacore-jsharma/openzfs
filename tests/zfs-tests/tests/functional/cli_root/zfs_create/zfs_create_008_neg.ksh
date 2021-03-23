@@ -53,8 +53,8 @@ function cleanup
 
 log_onexit cleanup
 
-set -A args "ab" "-?" "-cV" "-Vc" "-c -V" "c" "V" "--c" "-e" "-s" \
-    "-blah" "-cV 12k" "-s -cV 1P" "-sc" "-Vs 5g" "-o" "--o" "-O" "--O" \
+set -A args "ab" "-?" "-cV" "-Vc" "-c -V" "c" "V" "\-\-c" "-e" "-s" \
+    "-blah" "-cV 12k" "-s -cV 1P" "-sc" "-Vs 5g" "-o" "\-\-o" "-O" "\-\-O" \
     "-o QuOta=none" "-o quota=non" "-o quota=abcd" "-o quota=0" "-o quota=" \
     "-o ResErVaTi0n=none" "-o reserV=none" "-o reservation=abcd" "-o reserv=" \
     "-o recorDSize=64k" "-o recordsize=2048K" "-o recordsize=2M" \

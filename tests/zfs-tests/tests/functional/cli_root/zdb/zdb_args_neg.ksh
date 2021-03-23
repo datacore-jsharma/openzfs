@@ -55,7 +55,7 @@ set -A args "create" "add" "destroy" "import fakepool" \
     "add fakepool raidz1" "add fakepool raidz2" \
     "add mirror fakepool" "add raidz fakepool" \
     "add raidz1 fakepool" "add raidz2 fakepool" \
-    "setvprop" "blah blah" "-%" "--?" "-*" "-=" \
+    "setvprop" "blah blah" "-%" "-?" "-=" \
     "-a" "-f" "-g" "-j" "-n" "-o" "-p" "-p /tmp" "-r" \
     "-t" "-w" "-z" "-E" "-H" "-I" "-J" "-K" \
     "-N" "-Q" "-R" "-T" "-W"
@@ -63,7 +63,6 @@ set -A args "create" "add" "destroy" "import fakepool" \
 log_assert "Execute zdb using invalid parameters."
 
 log_onexit cleanup
-
 function cleanup
 {
 	default_cleanup_noexit
@@ -80,4 +79,5 @@ default_mirror_setup_noexit $DISKS
 
 test_imported_pool
 
+zpool destroy $TESTPOOL
 log_pass "Badly formed zdb parameters fail as expected."

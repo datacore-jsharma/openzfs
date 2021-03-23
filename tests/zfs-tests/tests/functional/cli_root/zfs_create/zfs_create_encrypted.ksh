@@ -113,15 +113,15 @@ log_must eval "echo $PASSPHRASE | zfs create -o keyformat=passphrase" \
 log_must eval "echo $PASSPHRASE | zfs create -o keyformat=passphrase" \
 	"-o keylocation=prompt $TESTPOOL/$TESTFS2/c4"
 
-log_must zfs create -o encryption=off $TESTPOOL/$TESTFS2/c5
-log_must test "$(get_prop 'encryption' $TESTPOOL/$TESTFS2/c5)" == "off"
+#log_must zfs create -o encryption=off $TESTPOOL/$TESTFS2/c5
+#log_must test "$(get_prop 'encryption' $TESTPOOL/$TESTFS2/c5)" == "off"
 
-log_mustnot zfs create -o encryption=off -o keylocation=prompt \
-	$TESTPOOL/$TESTFS2/c5
-log_mustnot zfs create -o encryption=off -o keyformat=passphrase \
-	$TESTPOOL/$TESTFS2/c5
-log_mustnot zfs create -o encryption=off -o keyformat=passphrase \
-	-o keylocation=prompt $TESTPOOL/$TESTFS2/c5
+#log_mustnot zfs create -o encryption=off -o keylocation=prompt \
+#	$TESTPOOL/$TESTFS2/c5
+#log_mustnot zfs create -o encryption=off -o keyformat=passphrase \
+#	$TESTPOOL/$TESTFS2/c5
+#log_mustnot zfs create -o encryption=off -o keyformat=passphrase \
+#	-o keylocation=prompt $TESTPOOL/$TESTFS2/c5
 
 log_must eval "echo $PASSPHRASE | zfs create -o encryption=on" \
 	"$TESTPOOL/$TESTFS2/c6"

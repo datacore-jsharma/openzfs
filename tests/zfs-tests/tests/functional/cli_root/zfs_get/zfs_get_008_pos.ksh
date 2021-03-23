@@ -52,15 +52,10 @@ set -A options " " "-r" "-H" "-p" "-rHp" "-o name" \
 
 set -A props type used available creation volsize referenced compressratio \
 	mounted origin recordsize quota reservation mountpoint sharenfs \
-	checksum compression atime devices exec readonly setuid snapdir \
-	aclinherit canmount primarycache secondarycache \
+	checksum compression devices snapdir \
+	canmount primarycache secondarycache \
 	usedbychildren usedbydataset usedbyrefreservation usedbysnapshots \
 	userquota@root groupquota@root userused@root groupused@root
-if is_freebsd; then
-	set -A props ${props[*]} jailed aclmode
-else
-	set -A props ${props[*]} zoned acltype
-fi
 
 zfs upgrade -v > /dev/null 2>&1
 if [[ $? -eq 0 ]]; then

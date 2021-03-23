@@ -58,20 +58,20 @@ DEVS=$(get_pool_devices ${TESTPOOL} ${DEV_RDSKDIR})
 log_note "$DEVS"
 [[ -n $DEVS ]] && set -A DISK $DEVS
 
-log_must dd if=/dev/zero of=$DEV_RDSKDIR/${DISK[1]} bs=1K count=256 conv=notrunc
+log_must ddrelease64.exe if=/dev/zero of=\\\\.\\${DISK[1]} bs=1k count=256 conv=notrunc
 log_must truncate -s 0 $TEMPFILE
 
-zdb -l $DEV_RDSKDIR/${DISK[0]}
+zdb -l \\\\.\\${DISK[0]}
 [[ $? -ne 0 ]] &&
 	log_fail "zdb -l exit codes are incorrect."
 
-zdb -l $DEV_RDSKDIR/${DISK[1]}
+zdb -l \\\\.\\${DISK[1]}
 [[ $? -ne 1 ]] &&
 	log_fail "zdb -l exit codes are incorrect."
 
-zdb -l $TEMPFILE
-[[ $? -ne 2 ]] &&
-	log_fail "zdb -l exit codes are incorrect."
+#zdb -l $TEMPFILE
+#[[ $? -ne 2 ]] &&
+#	log_fail "zdb -l exit codes are incorrect."
 
 cleanup
 

@@ -44,10 +44,10 @@ typeset -a features=(
     "large_blocks"
     "hole_birth"
     "large_dnode"
-    "userobj_accounting"
     "encryption"
 )
-FILEVDEV="$TEST_BASE_DIR/zpool_set_features.$$.dat"
+#FILEVDEV="$TEST_BASE_DIR/zpool_set_features.$$.dat"
+FILEVDEV=$(echo $DISKS | awk '{print $2}')
 
 # Verify 'zpool set' is able to enable a single feature
 for feature in "${features[@]}"

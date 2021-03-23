@@ -47,8 +47,8 @@ verify_runnable "both"
 typeset val_opts=(p r H)
 typeset v_props=(type used available creation volsize referenced compressratio \
     mounted origin recordsize quota reservation mountpoint sharenfs checksum \
-    compression atime devices exec readonly setuid snapdir version \
-    aclinherit canmount primarycache secondarycache \
+    compression devices snapdir version \
+    canmount primarycache secondarycache \
     usedbychildren usedbydataset usedbyrefreservation usedbysnapshots)
 if is_freebsd; then
 	typeset v_props_os=(jailed aclmode)

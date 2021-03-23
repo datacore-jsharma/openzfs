@@ -59,7 +59,7 @@ function cleanup
 	[ -n "$recursive" ] && set_tunable64 VOL_RECURSIVE $recursive
 }
 
-set -A datasets "$TESTPOOL" "$TESTPOOL2"
+set -A datasets "$TESTPOOL"
 
 log_assert "'zpool destroy <pool>' can destroy a specified pool."
 
@@ -73,7 +73,8 @@ if is_freebsd; then
 	typeset recursive=$(get_tunable VOL_RECURSIVE)
 	log_must set_tunable64 VOL_RECURSIVE 1
 fi
-create_pool $TESTPOOL2 $ZVOL_DEVDIR/$TESTPOOL1/$TESTVOL
+
+#create_pool $TESTPOOL2 $ZVOL_DEVDIR/$TESTPOOL1/$TESTVOL
 
 typeset -i i=0
 while (( i < ${#datasets[*]} )); do
