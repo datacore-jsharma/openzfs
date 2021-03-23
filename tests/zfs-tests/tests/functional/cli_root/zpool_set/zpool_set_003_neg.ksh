@@ -56,8 +56,9 @@ log_onexit cleanup
 
 log_assert "zpool set cannot set a readonly property"
 
-FILEVDEV="$TEST_BASE_DIR/zpool_set_003.$$.dat"
-log_must mkfile $MINVDEVSIZE $FILEVDEV
+#FILEVDEV="$TEST_BASE_DIR/zpool_set_003.$$.dat"
+#log_must mkfile $MINVDEVSIZE $FILEVDEV
+FILEVDEV=$(echo $DISKS | awk '{print $2}')
 log_must zpool create $TESTPOOL1 $FILEVDEV
 
 typeset -i i=0;

@@ -49,7 +49,6 @@ verify_runnable "global"
 log_assert "Execute zdb using valid parameters."
 
 log_onexit cleanup
-
 function cleanup
 {
 	default_cleanup_noexit
@@ -58,7 +57,7 @@ function cleanup
 function test_imported_pool
 {
 	typeset -a args=("-A" "-b" "-C" "-c" "-d" "-D" "-G" "-h" "-i" "-L" \
-            "-M" "-P" "-s" "-v" "-Y" "-y")
+            "-M" "-P" "-s" "-v")
         for i in ${args[@]}; do
 		log_must eval "zdb $i $TESTPOOL >/dev/null"
 	done
@@ -68,7 +67,7 @@ function test_exported_pool
 {
 	log_must zpool export $TESTPOOL
 	typeset -a args=("-A" "-b" "-C" "-c" "-d" "-D" "-F" "-G" "-h" "-i" "-L" "-M" \
-            "-P" "-s" "-v" "-X" "-Y" "-y")
+            "-P" "-s" "-v" "-X")
         for i in ${args[@]}; do
 		log_must eval "zdb -e $i $TESTPOOL >/dev/null"
 	done
@@ -82,13 +81,14 @@ function test_vdev
 	log_note $VDEVS
 	set -A VDEV_ARRAY $VDEVS
         for i in ${args[@]}; do
-		log_must eval "zdb -l $i ${VDEV_ARRAY[0]} >/dev/null"
+		disk=${VDEV_ARRAY[0]}
+		log_must zdb -l $i \\\\.\\$disk >/dev/null
 	done
 }
 
 function test_metaslab
 {
-	typeset -a args=("-A" "-L" "-P" "-Y")
+	typeset -a args=("-A" "-L" "-P")
         for i in ${args[@]}; do
 		log_must eval "zdb -m $i $TESTPOOL >/dev/null"
 	done

@@ -73,13 +73,13 @@ for dp in ${depth_array[@]}; do
 	while (( fs<${#fs_type[*]} )); do
 		if [[ "$dp" == "0" ]] && \
 		  [[ "${fs_type[$fs]}" == "volume" || "${fs_type[$fs]}" == "snapshot" ]]; then
-			log_must eval "zfs list -H -d $dp -o name -t ${fs_type[$fs]} $DEPTH_FS > $DEPTH_OUTPUT"
+			log_must eval "zfs list -H -d $dp -o name -t ${fs_type[$fs]} $DEPTH_FS |  sed -e "s/\r//g" > $DEPTH_OUTPUT"
 			[[ -s "$DEPTH_OUTPUT" ]] && \
 				log_fail "$DEPTH_OUTPUT should be null."
-			log_mustnot zfs list -rH -o name -t ${fs_type[$fs]} $DEPTH_FS | egrep -e '$eg_opt'
+			log_mustnot zfs list -rH -o name -t ${fs_type[$fs]} $DEPTH_FS | sed -e "s/\r//g" | egrep -e '$eg_opt'
 		else
-			log_must eval "zfs list -H -d $dp -o name -t ${fs_type[$fs]} $DEPTH_FS > $DEPTH_OUTPUT"
-			log_must eval "zfs list -rH -o name -t ${fs_type[$fs]} $DEPTH_FS | egrep -e '$eg_opt' > $EXPECT_OUTPUT"
+			log_must eval "zfs list -H -d $dp -o name -t ${fs_type[$fs]} $DEPTH_FS |  sed -e "s/\r//g" > $DEPTH_OUTPUT"
+			log_must eval "zfs list -rH -o name -t ${fs_type[$fs]} $DEPTH_FS |  sed -e "s/\r//g" | egrep -e '$eg_opt' > $EXPECT_OUTPUT"
 			log_must diff $DEPTH_OUTPUT $EXPECT_OUTPUT
 		fi
 		(( fs+=1 ))

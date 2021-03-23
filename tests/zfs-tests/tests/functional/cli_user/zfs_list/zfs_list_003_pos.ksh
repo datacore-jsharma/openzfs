@@ -63,8 +63,8 @@ done
 
 cd /tmp
 
-for path in $TESTPOOL/$TESTFS $TESTDIR ./../$TESTDIR ; do
-	zfs list -rH -o name $path > $tmpfile
+for path in $TESTPOOL/$TESTFS; do
+	zfs list -rH -o name $path | sed -e "s/\r//g" > $tmpfile
 	for fs in $children ; do
 		grep "^${fs}$" $tmpfile > /dev/null 2>&1
 		if (( $? != 0 )); then

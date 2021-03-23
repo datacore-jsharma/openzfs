@@ -49,14 +49,9 @@ typeset options=(" " p r H)
 
 typeset zfs_props=("type" used available creation volsize referenced \
     compressratio mounted origin recordsize quota reservation mountpoint \
-    sharenfs checksum compression atime devices exec readonly setuid \
+    sharenfs checksum compression atime devices \
     snapdir aclinherit canmount primarycache secondarycache version \
     usedbychildren usedbydataset usedbyrefreservation usedbysnapshots)
-if is_freebsd; then
-	typeset zfs_props_os=(jailed aclmode)
-else
-	typeset zfs_props_os=(zoned acltype)
-fi
 typeset userquota_props=(userquota@root groupquota@root userused@root \
     groupused@root)
 typeset props=("${zfs_props[@]}" \

@@ -49,7 +49,7 @@ function verify_sort { # command list name
 	log_must eval "$CMD > /dev/null"
 
 	# Now check the sort order
-	for dataset in $( $CMD )
+	for dataset in $( $CMD|sed -e "s/\r//g" )
 	do
 		ACTUAL=$(basename $dataset)
 		if [ "$dataset" != "$TESTPOOL/$TESTFS" ]
@@ -91,7 +91,7 @@ function verify_reverse_sort { # command list name
 		"expecting the reverse of '$list'"
 	log_must eval "$CMD > /dev/null"
 
-	for dataset in $( $CMD )
+	for dataset in $( $CMD | sed -e "s/\r//g" )
 	do
 		ACTUAL=$(basename $dataset)
 		if [ "$dataset" != "$TESTPOOL/$TESTFS" ]

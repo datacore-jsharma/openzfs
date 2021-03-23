@@ -78,8 +78,8 @@ function set_and_check #<dataset><set_prop_name><set_value><check_prop_name>
 log_assert "Properties with aliases also work with those aliases."
 
 set -A ro_prop "available" "avail" "referenced" "refer"
-set -A rw_prop "readonly" "rdonly" "compression" "compress" "reservation" "reserv"
-set -A chk_prop "rdonly" "readonly" "compress" "compression" "reserv" "reservation"
+set -A rw_prop "compression" "compress" "reservation" "reserv"
+set -A chk_prop "compress" "compression" "reserv" "reservation"
 set -A size "512" "1024" "2048" "4096" "8192" "16384" "32768" "65536" "131072"
 
 pool=$TESTPOOL

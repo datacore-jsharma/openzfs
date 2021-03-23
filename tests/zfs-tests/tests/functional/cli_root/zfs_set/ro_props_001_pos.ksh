@@ -54,7 +54,7 @@ set -A dataset $TESTPOOL/$TESTFS $TESTPOOL/$TESTVOL \
 typeset ro_props="type used creation referenced refer compressratio \
 	mounted origin"
 typeset snap_ro_props="volsize recordsize recsize quota reservation reserv mountpoint \
-	sharenfs checksum compression compress atime devices exec readonly rdonly \
+	sharenfs checksum compression compress devices exec \
 	setuid"
 if is_freebsd; then
 	snap_ro_props+=" jailed"

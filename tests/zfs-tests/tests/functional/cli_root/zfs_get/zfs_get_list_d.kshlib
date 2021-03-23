@@ -52,7 +52,7 @@ function depth_fs_setup
 			fslist=$DEPTH_FS
 		else
 			(( k=i-1 ))
-			fslist=$(zfs list -rH -t filesystem -o name $DEPTH_FS|grep depth"$k"$)
+			fslist=$(zfs list -rH -t filesystem -o name $DEPTH_FS | sed -e "s/\r//g" |grep depth"$k"$)
 			if (( $? != 0 )); then
 				log_fail "No depth$k filesystem"
 			fi
@@ -65,7 +65,7 @@ function depth_fs_setup
 					log_must zfs create -V 8M $fs/vol_"$j"_depth"$i"
 				fi
 				log_must zfs snapshot $fs@snap_"$j"_depth"$i"
-				log_must zfs bookmark $fs@snap_"$j"_depth"$i" '#bookmark'_"$j"_depth"$i"
+#				log_must zfs bookmark $fs@snap_"$j"_depth"$i" '#bookmark'_"$j"_depth"$i"
 				(( j=j+1 ))
 			done
 		done

@@ -318,10 +318,10 @@ function default_setup_noexit
 		log_must zfs create $TESTPOOL/$TESTCTR
 		log_must zfs set canmount=off $TESTPOOL/$TESTCTR
 		log_must zfs create $TESTPOOL/$TESTCTR/$TESTFS1
-		if [[ -z $no_mountpoint ]]; then
-			log_must zfs set mountpoint=$TESTDIR1 \
-			    $TESTPOOL/$TESTCTR/$TESTFS1
-		fi
+		#if [[ -z $no_mountpoint ]]; then
+		#	log_must zfs set mountpoint=$TESTDIR1 \
+		#	    $TESTPOOL/$TESTCTR/$TESTFS1
+		#fi
 	fi
 
 	if [[ -n $volume ]]; then
@@ -620,6 +620,7 @@ function default_cleanup_noexit
 		do
 			for pool in ${ALL_POOLS}
 			do
+				pool=`echo $pool | sed -e "s/\r//g"`
 				if safe_to_destroy_pool $pool ;
 				then
 					destroy_pool $pool
@@ -631,13 +632,13 @@ function default_cleanup_noexit
 		zfs mount -a
 	else
 		typeset fs=""
-		for fs in $(zfs list -H -o name \
+		for fs in $(zfs list -H -o name | sed -e "s/\r//g" \
 		    | grep "^$ZONE_POOL/$ZONE_CTR[01234]/"); do
 			destroy_dataset "$fs" "-Rf"
 		done
 
 		# Need cleanup here to avoid garbage dir left.
-		for fs in $(zfs list -H -o name); do
+		for fs in $(zfs list -H -o name | sed -e "s/\r//g"); do
 			[[ $fs == /$ZONE_POOL ]] && continue
 			[[ -d $fs ]] && log_must rm -rf $fs/*
 		done
@@ -646,7 +647,7 @@ function default_cleanup_noexit
 		# Reset the $ZONE_POOL/$ZONE_CTR[01234] file systems property to
 		# the default value
 		#
-		for fs in $(zfs list -H -o name); do
+		for fs in $(zfs list -H -o name | sed -e "s/\r//g"); do
 			if [[ $fs == $ZONE_POOL/$ZONE_CTR[01234] ]]; then
 				log_must zfs set reservation=none $fs
 				log_must zfs set recordsize=128K $fs
@@ -1244,7 +1245,7 @@ function get_pool_prop # property pool
 	typeset pool=$2
 
 	if poolexists $pool ; then
-		prop_val=$(zpool get -pH $prop $pool 2>/dev/null | tail -1 | \
+		prop_val=$(zpool get -pH $prop $pool | sed -e "s/\r//g" 2>/dev/null | tail -1 | \
 			awk '{print $3}')
 		if [[ $? -ne 0 ]]; then
 			log_note "Unable to get $prop property for pool " \
@@ -1266,7 +1267,7 @@ function get_pool_prop # property pool
 
 function poolexists
 {
-	typeset pool=$1
+	typeset pool=`echo $1 | sed -e "s/\r//g"`
 
 	if [[ -z $pool ]]; then
 		log_note "No pool name given."
@@ -2882,7 +2883,7 @@ function safe_to_destroy_pool { # $1 the pool name
 
 	typeset pool=""
 	typeset DONT_DESTROY=""
-
+	pname=`echo $1 | sed -e "s/\r//g"`
 	# We check that by deleting the $1 pool, we're not
 	# going to pull the rug out from other pools. Do this
 	# by looking at all other pools, ensuring that they
@@ -2891,14 +2892,14 @@ function safe_to_destroy_pool { # $1 the pool name
 	for pool in $(zpool list -H -o name)
 	do
 		ALTMOUNTPOOL=""
-
+		pool=`echo $pool | sed -e "s/\r//g"`
 		# this is a list of the top-level directories in each of the
 		# files that make up the path to the files the pool is based on
-		FILEPOOL=$(zpool status -v $pool | grep /$1/ | \
+		FILEPOOL=$(zpool status -v $pool | grep /$pname/ | \
 			awk '{print $1}')
 
 		# this is a list of the zvols that make up the pool
-		ZVOLPOOL=$(zpool status -v $pool | grep "$ZVOL_DEVDIR/$1$" \
+		ZVOLPOOL=$(zpool status -v $pool | grep "$ZVOL_DEVDIR/$pname$" \
 		    | awk '{print $1}')
 
 		# also want to determine if it's a file-based pool using an
@@ -2909,7 +2910,7 @@ function safe_to_destroy_pool { # $1 the pool name
 
 		for pooldir in $POOL_FILE_DIRS
 		do
-			OUTPUT=$(zfs list -H -r -o mountpoint $1 | \
+			OUTPUT=$(zfs list -H -r -o mountpoint $pname | \
 					grep "${pooldir}$" | awk '{print $1}')
 
 			ALTMOUNTPOOL="${ALTMOUNTPOOL}${OUTPUT}"

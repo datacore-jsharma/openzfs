@@ -89,7 +89,8 @@ log_onexit cleanup
 
 log_assert "Verify that an exported pool can be imported."
 
-setup_filesystem "$DEVICE_FILES" $TESTPOOL1 $TESTFS $TESTDIR1
+#setup_filesystem "$DEVICE_FILES" $TESTPOOL1 $TESTFS $TESTDIR1
+setup_filesystem "$DISKS" $TESTPOOL1 $TESTFS $TESTDIR1
 
 checksum1=$(sum $MYTESTFILE | awk '{print $1}')
 

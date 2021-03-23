@@ -42,7 +42,7 @@
 #
 
 ZFS_VERSION=$(zfs upgrade | head -1 | awk '{print $NF}' \
-	| sed -e 's/\.//g')
+	| sed -e 's/\.//g' |  sed -e "s/\r//g")
 
 verify_runnable "both"
 
