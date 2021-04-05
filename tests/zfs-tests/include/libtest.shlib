@@ -304,7 +304,7 @@ function default_setup_noexit
 	rm -rf $TESTDIR  || log_unresolved Could not remove $TESTDIR
 	mkdir -p $TESTDIR || log_unresolved Could not create $TESTDIR
 
-	#log_must zfs create $TESTPOOL/$TESTFS
+	log_must zfs create $TESTPOOL/$TESTFS
 	#if [[ -z $no_mountpoint ]]; then
 	#	log_must zfs set mountpoint=$TESTDIR $TESTPOOL/$TESTFS
 	#fi
@@ -2432,9 +2432,10 @@ function cleanup_devices #vdevs
 #		zero_partitions $vdev
 #	done
 
-	poolexists $pool && destroy_pool $pool
-	create_pool $pool $@
-	destroy_pool $pool
+	zpool destroy -f $pool
+#	poolexists $pool && destroy_pool $pool
+#	create_pool $pool $@
+#	destroy_pool $pool
 
 	return 0
 }

@@ -57,17 +57,19 @@ do
 done
 
 typeset zfs_props=("type" used available creation volsize referenced \
-    compressratio mounted origin recordsize quota reservation mountpoint \
-    sharenfs checksum compression atime devices \
-    snapdir aclinherit canmount primarycache secondarycache version \
+    compressratio origin recordsize quota reservation \
+    checksum compression devices \
+    snapdir primarycache secondarycache version \
     usedbychildren usedbydataset usedbyrefreservation usedbysnapshots)
 typeset userquota_props=(userquota@root groupquota@root userused@root \
     groupused@root)
 typeset all_props=("${zfs_props[@]}" \
     "${zfs_props_os[@]}" \
     "${userquota_props[@]}")
-typeset dataset=($TESTPOOL/$TESTCTR $TESTPOOL/$TESTFS $TESTPOOL/$TESTVOL \
-	$TESTPOOL/$TESTFS@$TESTSNAP $TESTPOOL/$TESTVOL@$TESTSNAP)
+#typeset dataset=($TESTPOOL/$TESTCTR $TESTPOOL/$TESTFS $TESTPOOL/$TESTVOL \
+#	$TESTPOOL/$TESTFS@$TESTSNAP $TESTPOOL/$TESTVOL@$TESTSNAP)
+typeset dataset=($TESTPOOL/$TESTCTR $TESTPOOL/$TESTVOL \
+	$TESTPOOL/$TESTVOL@$TESTSNAP)
 
 typeset bookmark_props=(creation)
 typeset bookmark=($TESTPOOL/$TESTFS#$TESTBKMARK $TESTPOOL/$TESTVOL#$TESTBKMARK)

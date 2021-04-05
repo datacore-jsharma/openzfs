@@ -36,6 +36,6 @@ verify_runnable "global"
 
 default_zvol_setup $DISK $VOLSIZE
 
-log_must mkdir $TESTDIR
+log_must mkdir -p $TESTDIR
 
 log_pass
