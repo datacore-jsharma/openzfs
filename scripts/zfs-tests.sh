@@ -218,8 +218,13 @@ create_links() {
 			[ ! -e "$STF_PATH/$i" ] || continue
 
 			if [ ! -d "$j/$i" ] && [ -e "$j/$i" ]; then
-				ln -sf "$j/$i" "$STF_PATH/$i" || \
-				    fail "Couldn't link $i"
+				if [ "$i" = "zfs" ] || [ "$i" = "zdb" ] || [ "$i" = "zpool" ]; then
+					 ln -sf "$STF_PATH/$i.exe" "$STF_PATH/$i" || \
+                                            fail "Couldn't link $i"
+				else
+					ln -sf "$j/$i" "$STF_PATH/$i" || \
+					    fail "Couldn't link $i"
+				fi
 				break
 			fi
 		done

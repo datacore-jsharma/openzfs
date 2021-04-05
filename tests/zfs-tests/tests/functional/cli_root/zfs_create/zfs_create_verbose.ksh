@@ -40,7 +40,7 @@ function dry_create_parseable
 {
 	typeset -n exp=$1
 	shift
-	typeset -a cmd=(zfs create -P "$@")
+	typeset -a cmd=(zfs create -p "$@")
 	typeset ds=${cmd[${#cmd[@]} - 1]}
 	typeset out
 	typeset -a toks

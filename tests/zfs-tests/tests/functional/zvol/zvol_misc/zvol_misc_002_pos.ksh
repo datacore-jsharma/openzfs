@@ -67,10 +67,11 @@ NUM_WRITES=40
 
 log_must zfs set volsize=128m $TESTPOOL/$TESTVOL
 
-log_must new_fs ${ZVOL_RDEVDIR}/$TESTPOOL/$TESTVOL
-wdisk=/dev/`lsblk | tail -1| awk {'print $1'}`
-log_must mount $wdisk $TESTDIR
-
+#log_must new_fs ${ZVOL_RDEVDIR}/$TESTPOOL/$TESTVOL
+mount_win_zvol $TESTDIR
+#wdisk=/dev/`lsblk | tail -1| awk {'print $1'}`
+#/usr/sbin/mkfs.ext4 $wdisk
+#log_must mount $wdisk $TESTDIR
 typeset -i fn=0
 typeset -i retval=0
 
@@ -116,4 +117,5 @@ if [ $retval -ne 0 ] ; then
 	fi
 fi
 
+unmount_win_zvol
 log_pass "Verify that ZFS volume snapshot could be fscked"

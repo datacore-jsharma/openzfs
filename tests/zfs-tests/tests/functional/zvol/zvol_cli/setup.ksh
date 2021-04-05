@@ -36,9 +36,9 @@
 verify_runnable "global"
 
 DISK=${DISKS%% *}
-if is_mpath_device $DISK; then
-	delete_partitions
-fi
+#if is_mpath_device $DISK; then
+#	delete_partitions
+#fi
 
 default_zvol_setup $DISK $VOLSIZE
 
