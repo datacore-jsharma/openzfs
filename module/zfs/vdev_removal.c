@@ -1627,6 +1627,8 @@ spa_vdev_remove_cancel_check(void *arg, dmu_tx_t *tx)
 
 	if (spa->spa_vdev_removal == NULL)
 		return (ENOTACTIVE);
+
+	TraceEvent(8, "%s:%d: Returning 0\n", __func__, __LINE__);
 	return (0);
 }
 
@@ -1788,7 +1790,7 @@ spa_vdev_remove_cancel_impl(spa_t *spa)
 		metaslab_group_activate(vd->vdev_log_mg);
 		spa_config_exit(spa, SCL_ALLOC | SCL_VDEV, FTAG);
 	}
-
+	dprintf("%s:%d: Returning %d\n", __func__, __LINE__, error);
 	return (error);
 }
 
@@ -1862,6 +1864,7 @@ spa_vdev_remove_log(vdev_t *vd, uint64_t *txg)
 	spa_t *spa = vd->vdev_spa;
 	int error = 0;
 
+	dprintf("%s:%d: vd = 0x%p, txg = 0x%p\n", __func__, __LINE__, vd, txg);
 	ASSERT(vd->vdev_islog);
 	ASSERT(vd == vd->vdev_top);
 	ASSERT3P(vd->vdev_log_mg, ==, NULL);
@@ -1901,6 +1904,7 @@ spa_vdev_remove_log(vdev_t *vd, uint64_t *txg)
 	if (error != 0) {
 		metaslab_group_activate(mg);
 		ASSERT3P(vd->vdev_log_mg, ==, NULL);
+		dprintf("%s:%d: Returning %d\n", __func__, __LINE__, error);
 		return (error);
 	}
 	ASSERT0(vd->vdev_stat.vs_alloc);
@@ -2040,9 +2044,8 @@ spa_vdev_remove_top_check(vdev_t *vd)
 	/*
 	 * All vdevs in normal class must have the same ashift.
 	 */
-	if (spa->spa_max_ashift != spa->spa_min_ashift) {
+	if (spa->spa_max_ashift != spa->spa_min_ashift)
 		return (SET_ERROR(EINVAL));
-	}
 
 	/*
 	 * A removed special/dedup vdev must have same ashift as normal class.
@@ -2087,8 +2090,9 @@ spa_vdev_remove_top_check(vdev_t *vd)
 			for (uint64_t cid = 0;
 			    cid < cvd->vdev_children; cid++) {
 				if (!cvd->vdev_child[cid]->vdev_ops->
-				    vdev_op_leaf)
+				    vdev_op_leaf) {
 					return (SET_ERROR(EINVAL));
+				}
 			}
 		}
 	}
@@ -2116,9 +2120,10 @@ spa_vdev_remove_top(vdev_t *vd, uint64_t *txg)
 	 * are errors.
 	 */
 	error = spa_vdev_remove_top_check(vd);
-	if (error != 0)
+	if (error != 0) {
+		dprintf("%s:%d: Returning %d\n", __func__, __LINE__, error);
 		return (error);
-
+	}
 	/*
 	 * Stop allocating from this vdev.  Note that we must check
 	 * that this is not the only device in the pool before
@@ -2172,6 +2177,8 @@ spa_vdev_remove_top(vdev_t *vd, uint64_t *txg)
 		spa_async_request(spa, SPA_ASYNC_INITIALIZE_RESTART);
 		spa_async_request(spa, SPA_ASYNC_TRIM_RESTART);
 		spa_async_request(spa, SPA_ASYNC_AUTOTRIM_RESTART);
+		dprintf("%s:%d: spa_vdev_remove_top_check returned %d\n",
+		    __func__, __LINE__, error);
 		return (error);
 	}
 
@@ -2184,6 +2191,7 @@ spa_vdev_remove_top(vdev_t *vd, uint64_t *txg)
 	    vdev_remove_initiate_sync, (void *)(uintptr_t)vd->vdev_id, tx);
 	dmu_tx_commit(tx);
 
+	TraceEvent(5, "%s:%d: Returning 0\n", __func__, __LINE__);
 	return (0);
 }
 
@@ -2208,6 +2216,8 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 	sysevent_t *ev = NULL;
 	char *vd_type = NULL, *vd_path = NULL;
 
+	dprintf("%s:%d: spa = 0x%p, guid = %llu, unspare = %d\n",
+	    __func__, __LINE__, spa, guid, unspare);
 	ASSERT(spa_writeable(spa));
 
 	if (!locked)
@@ -2221,6 +2231,8 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 		if (!locked)
 			return (spa_vdev_exit(spa, NULL, txg, error));
 
+		dprintf("%s:%d: Returning error = %d\n", __func__, __LINE__,
+		    error);
 		return (error);
 	}
 
@@ -2330,6 +2342,7 @@ spa_vdev_remove(spa_t *spa, uint64_t guid, boolean_t unspare)
 	if (ev != NULL)
 		spa_event_post(ev);
 
+	dprintf("%s:%d: Returning 0\n", __func__, __LINE__);
 	return (error);
 }
 

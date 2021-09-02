@@ -2223,6 +2223,8 @@ zio_wait(zio_t *zio)
 	long timeout = MSEC_TO_TICK(zfs_deadman_ziotime_ms);
 	int error;
 
+	TraceEvent(8, "%s:%d: zio = 0x%p\n", __func__, __LINE__, zio);
+
 	ASSERT3S(zio->io_stage, ==, ZIO_STAGE_OPEN);
 	ASSERT3P(zio->io_executor, ==, NULL);
 
@@ -2251,6 +2253,8 @@ zio_wait(zio_t *zio)
 	error = zio->io_error;
 	zio_destroy(zio);
 
+	TraceEvent(8, "%s:%d: Returning %d\n",
+	    __func__, __LINE__, error);
 	return (error);
 }
 

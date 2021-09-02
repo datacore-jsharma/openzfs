@@ -384,6 +384,7 @@ spa_keystore_wkey_hold_ddobj_impl(spa_t *spa, uint64_t ddobj,
 	found_wkey = avl_find(&spa->spa_keystore.sk_wkeys, &search_wkey, NULL);
 	if (!found_wkey) {
 		ret = SET_ERROR(ENOENT);
+		dprintf("%s:%d: Returning %d\n", __func__, __LINE__, ret);
 		goto error;
 	}
 
@@ -391,6 +392,7 @@ spa_keystore_wkey_hold_ddobj_impl(spa_t *spa, uint64_t ddobj,
 	dsl_wrapping_key_hold(found_wkey, tag);
 
 	*wkey_out = found_wkey;
+	TraceEvent(8, "%s:%d: Returning 0\n", __func__, __LINE__);
 	return (0);
 
 error:
@@ -427,6 +429,7 @@ spa_keystore_wkey_hold_dd(spa_t *spa, dsl_dir_t *dd, void *tag,
 		rw_exit(&spa->spa_keystore.sk_wkeys_lock);
 
 	*wkey_out = wkey;
+	TraceEvent(8, "%s:%d: Returning 0\n", __func__, __LINE__);
 	return (0);
 
 error:
@@ -434,6 +437,9 @@ error:
 		rw_exit(&spa->spa_keystore.sk_wkeys_lock);
 
 	*wkey_out = NULL;
+	TraceEvent(ret > 0 ? 2 : 8, "%s:%d: Returning %d\n",
+	    __func__, __LINE__, ret);
+
 	return (ret);
 }
 
@@ -624,6 +630,7 @@ spa_keystore_dsl_key_hold_impl(spa_t *spa, uint64_t dckobj, void *tag,
 	zfs_refcount_add(&found_dck->dck_holds, tag);
 
 	*dck_out = found_dck;
+	TraceEvent(8, "%s:%d: Returning 0\n", __func__, __LINE__);
 	return (0);
 
 error:
@@ -1135,6 +1142,7 @@ dmu_objset_check_wkey_loaded(dsl_dir_t *dd)
 
 	dsl_wrapping_key_rele(wkey, FTAG);
 
+	TraceEvent(8, "%s:%d: Returning 0\n", __func__, __LINE__);
 	return (0);
 }
 
@@ -1154,6 +1162,7 @@ dsl_dir_get_crypt(dsl_dir_t *dd, uint64_t *crypt)
 {
 	if (dd->dd_crypto_obj == 0) {
 		*crypt = ZIO_CRYPT_OFF;
+		TraceEvent(8, "%s:%d: Returning 0\n", __func__, __LINE__);
 		return (0);
 	}
 
@@ -1760,8 +1769,13 @@ dmu_objset_create_crypt_check(dsl_dir_t *parentdd, dsl_crypto_params_t *dcp,
 	uint64_t pcrypt, crypt;
 	dsl_crypto_params_t dummy_dcp = { 0 };
 
-	if (will_encrypt != NULL)
+	dprintf("%s:%d: parentdd = 0x%p, dcp = 0x%p\n", __func__,
+	    __LINE__, parentdd, dcp);
+	if (will_encrypt != NULL) {
+		dprintf("%s:%d: will_encrypt = %d\n", __func__,
+		    __LINE__, will_encrypt);
 		*will_encrypt = B_FALSE;
+	}
 
 	if (dcp == NULL)
 		dcp = &dummy_dcp;
@@ -1771,8 +1785,11 @@ dmu_objset_create_crypt_check(dsl_dir_t *parentdd, dsl_crypto_params_t *dcp,
 
 	if (parentdd != NULL) {
 		ret = dsl_dir_get_crypt(parentdd, &pcrypt);
-		if (ret != 0)
+		if (ret != 0) {
+			dprintf("%s:%d: Returning %d\n", __func__,
+			    __LINE__, ret);
 			return (ret);
+		}
 	} else {
 		pcrypt = ZIO_CRYPT_OFF;
 	}
@@ -1790,6 +1807,7 @@ dmu_objset_create_crypt_check(dsl_dir_t *parentdd, dsl_crypto_params_t *dcp,
 		    strcmp(dcp->cp_keylocation, "none") != 0))
 			return (SET_ERROR(EINVAL));
 
+		dprintf("%s:%d: Returning 0\n", __func__, __LINE__);
 		return (0);
 	}
 
@@ -1803,16 +1821,14 @@ dmu_objset_create_crypt_check(dsl_dir_t *parentdd, dsl_crypto_params_t *dcp,
 	 */
 	if (parentdd != NULL &&
 	    !spa_feature_is_enabled(parentdd->dd_pool->dp_spa,
-	    SPA_FEATURE_ENCRYPTION)) {
+	    SPA_FEATURE_ENCRYPTION))
 		return (SET_ERROR(EOPNOTSUPP));
-	}
 
 	/* Check for errata #4 (encryption enabled, bookmark_v2 disabled) */
 	if (parentdd != NULL &&
 	    !spa_feature_is_enabled(parentdd->dd_pool->dp_spa,
-	    SPA_FEATURE_BOOKMARK_V2)) {
+	    SPA_FEATURE_BOOKMARK_V2))
 		return (SET_ERROR(EOPNOTSUPP));
-	}
 
 	/* handle inheritance */
 	if (dcp->cp_wkey == NULL) {
@@ -1831,6 +1847,7 @@ dmu_objset_create_crypt_check(dsl_dir_t *parentdd, dsl_crypto_params_t *dcp,
 		if (ret != 0)
 			return (ret);
 
+		dprintf("%s:%d: Returning 0\n", __func__, __LINE__);
 		return (0);
 	}
 
@@ -1859,6 +1876,7 @@ dmu_objset_create_crypt_check(dsl_dir_t *parentdd, dsl_crypto_params_t *dcp,
 		return (SET_ERROR(EINVAL));
 	}
 
+	dprintf("%s:%d: Returning 0\n", __func__, __LINE__);
 	return (0);
 }
 
