@@ -588,6 +588,7 @@ zcp_nvpair_value_to_lua(lua_State *state, nvpair_t *pair,
 		return (SET_ERROR(EINVAL));
 	}
 	}
+	dprintf("%s:%d Returning error %d", __func__, __LINE__, err);
 	return (err);
 }
 
@@ -1045,6 +1046,7 @@ zcp_eval(const char *poolname, const char *program, boolean_t sync,
 
 	if (instrlimit > zfs_lua_max_instrlimit)
 		return (SET_ERROR(EINVAL));
+
 	if (memlimit == 0 || memlimit > zfs_lua_max_memlimit)
 		return (SET_ERROR(EINVAL));
 

@@ -591,8 +591,8 @@ dnode_allocate(dnode_t *dn, dmu_object_type_t ot, int blocksize, int ibs,
 
 	ibs = MIN(MAX(ibs, DN_MIN_INDBLKSHIFT), DN_MAX_INDBLKSHIFT);
 
-	dprintf("os=%p obj=%llu txg=%llu blocksize=%d ibs=%d dn_slots=%d\n",
-	    dn->dn_objset, (u_longlong_t)dn->dn_object,
+	TraceEvent(5, "os=%p obj=%llu txg=%llu blocksize=%d ibs=%d dn_slots="
+	    "%d\n", dn->dn_objset, (u_longlong_t)dn->dn_object,
 	    (u_longlong_t)tx->tx_txg, blocksize, ibs, dn_slots);
 	DNODE_STAT_BUMP(dnode_allocate);
 
@@ -1110,15 +1110,25 @@ dnode_check_slots_free(dnode_children_t *children, int idx, int slots)
 			    !DNODE_IS_DIRTY(dn));
 			mutex_exit(&dn->dn_mtx);
 
-			if (!can_free)
+			if (!can_free) {
+				dprintf("%s:%d: dn->dn_type = %d, "
+				    "zfs_refcount_is_zero(&dn->dn_holds) = %d."
+				    " Returning B_FALSE = %d\n",
+				    __func__, __LINE__, dn->dn_type,
+				    zfs_refcount_is_zero(&dn->dn_holds),
+				    B_FALSE);
 				return (B_FALSE);
-			else
+			} else
 				continue;
 		} else {
+			dprintf("%s:%d: Returning B_FALSE = %d\n", __func__,
+			    __LINE__, B_FALSE);
 			return (B_FALSE);
 		}
 	}
 
+	TraceEvent(8, "%s:%d: Returning B_TRUE = %d\n", __func__, __LINE__,
+	    B_TRUE);
 	return (B_TRUE);
 }
 
@@ -1284,6 +1294,10 @@ dnode_hold_impl(objset_t *os, uint64_t object, int flag, int slots,
 	dnode_phys_t *dn_block;
 	dnode_handle_t *dnh;
 
+	TraceEvent(8, "%s:%d: os = 0x%p, object = %llu, flag = %d, slots = %d,"
+	    " tag = 0x%p, dnp = 0x%p", __func__, __LINE__, os, object, flag,
+	    slots, tag, dnp);
+
 	ASSERT(!(flag & DNODE_MUST_BE_ALLOCATED) || (slots == 0));
 	ASSERT(!(flag & DNODE_MUST_BE_FREE) || (slots > 0));
 	IMPLY(flag & DNODE_DRY_RUN, (tag == NULL) && (dnp == NULL));
@@ -1310,17 +1324,21 @@ dnode_hold_impl(objset_t *os, uint64_t object, int flag, int slots,
 			dn = DMU_PROJECTUSED_DNODE(os);
 		if (dn == NULL)
 			return (SET_ERROR(ENOENT));
+
 		type = dn->dn_type;
 		if ((flag & DNODE_MUST_BE_ALLOCATED) && type == DMU_OT_NONE)
 			return (SET_ERROR(ENOENT));
+
 		if ((flag & DNODE_MUST_BE_FREE) && type != DMU_OT_NONE)
 			return (SET_ERROR(EEXIST));
+
 		DNODE_VERIFY(dn);
 		/* Don't actually hold if dry run, just return 0 */
 		if (!(flag & DNODE_DRY_RUN)) {
 			(void) zfs_refcount_add(&dn->dn_holds, tag);
 			*dnp = dn;
 		}
+		dprintf("%s:%d: Returning 0\n", __func__, __LINE__);
 		return (0);
 	}
 
@@ -1355,6 +1373,7 @@ dnode_hold_impl(objset_t *os, uint64_t object, int flag, int slots,
 	if (err) {
 		DNODE_STAT_BUMP(dnode_hold_dbuf_read);
 		dbuf_rele(db, FTAG);
+		dprintf("%s:%d: Returning %d\n", __func__, __LINE__, err);
 		return (err);
 	}
 
@@ -1559,6 +1578,7 @@ dnode_hold_impl(objset_t *os, uint64_t object, int flag, int slots,
 	dbuf_rele(db, FTAG);
 
 	*dnp = dn;
+	TraceEvent(8, "%s:%d: Returning 0\n", __func__, __LINE__);
 	return (0);
 }
 

@@ -57,6 +57,7 @@ dodefault(zfs_prop_t prop, int intsz, int numints, void *buf)
 	if (zfs_prop_get_type(prop) == PROP_TYPE_STRING) {
 		if (intsz != 1)
 			return (SET_ERROR(EOVERFLOW));
+
 		(void) strncpy(buf, zfs_prop_default_string(prop),
 		    numints);
 	} else {
@@ -66,6 +67,7 @@ dodefault(zfs_prop_t prop, int intsz, int numints, void *buf)
 		*(uint64_t *)buf = zfs_prop_default_numeric(prop);
 	}
 
+	TraceEvent(8, "%s:%d: Returning 0\n", __func__, __LINE__);
 	return (0);
 }
 
@@ -182,6 +184,8 @@ dsl_prop_get_ds(dsl_dataset_t *ds, const char *propname,
 		if (err != ENOENT) {
 			if (setpoint != NULL && err == 0)
 				dsl_dataset_name(ds, setpoint);
+			dprintf("%s:%d: Returning %d\n", __func__, __LINE__,
+			    err);
 			return (err);
 		}
 
@@ -194,8 +198,11 @@ dsl_prop_get_ds(dsl_dataset_t *ds, const char *propname,
 			    ZPROP_INHERIT_SUFFIX);
 			err = zap_contains(mos, zapobj, inheritstr);
 			kmem_strfree(inheritstr);
-			if (err != 0 && err != ENOENT)
+			if (err != 0 && err != ENOENT) {
+				dprintf("%s:%d: Returning %d\n", __func__,
+				    __LINE__, err);
 				return (err);
+			}
 		}
 
 		if (err == ENOENT) {
@@ -210,6 +217,8 @@ dsl_prop_get_ds(dsl_dataset_t *ds, const char *propname,
 					(void) strlcpy(setpoint,
 					    ZPROP_SOURCE_VAL_RECVD,
 					    MAXNAMELEN);
+				dprintf("%s:%d: Returning %d\n", __func__,
+				    __LINE__, err);
 				return (err);
 			}
 		}
@@ -896,6 +905,7 @@ dsl_props_set_check(void *arg, dmu_tx_t *tx)
 		return (SET_ERROR(ENOTSUP));
 	}
 	dsl_dataset_rele(ds, FTAG);
+	TraceEvent(8, "%s:%d: Returning 0\n", __func__, __LINE__);
 	return (0);
 }
 

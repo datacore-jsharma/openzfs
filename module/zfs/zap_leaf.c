@@ -422,7 +422,6 @@ zap_leaf_lookup(zap_leaf_t *l, zap_name_t *zn, zap_entry_handle_t *zeh)
 			return (0);
 		}
 	}
-
 	return (SET_ERROR(ENOENT));
 }
 
@@ -487,6 +486,8 @@ zap_entry_read(const zap_entry_handle_t *zeh,
 
 	if (zeh->zeh_num_integers > num_integers)
 		return (SET_ERROR(EOVERFLOW));
+
+	TraceEvent(8, "%s:%d: Returning 0\n", __func__, __LINE__);
 	return (0);
 
 }
@@ -508,6 +509,8 @@ zap_entry_read_name(zap_t *zap, const zap_entry_handle_t *zeh, uint16_t buflen,
 	}
 	if (le->le_name_numints > buflen)
 		return (SET_ERROR(EOVERFLOW));
+
+	TraceEvent(8, "%s:%d: Returning 0\n", __func__, __LINE__);
 	return (0);
 }
 
