@@ -419,7 +419,8 @@ zfs_find_dvp_vp(zfsvfs_t *zfsvfs, char *filename, int finalpartmaynotexist,
 				    zp->z_size, '!FSZ');
 				zfs_uio_t uio;
 				struct iovec iov = { rpb, zp->z_size };
-				zfs_uio_iovec_init(&uio, &iov, 1, 0, UIO_SYSSPACE, zp->z_size, 0);
+				zfs_uio_iovec_init(&uio, &iov, 1, 0,
+				    UIO_SYSSPACE, zp->z_size, 0);
 				zfs_readlink(vp, &uio, NULL);
 				VN_RELE(vp);
 
@@ -2379,11 +2380,13 @@ zfswin_insert_xattrname(struct vnode *vp, char *xattrname, uint8_t *outbuffer,
 				iov.iov_len = roomforvalue;
 
 				zfs_uio_t uio;
-				zfs_uio_iovec_init(&uio, &iov, 1, 0, UIO_SYSSPACE, roomforvalue, 0);
+				zfs_uio_iovec_init(&uio, &iov, 1, 0,
+				    UIO_SYSSPACE, roomforvalue, 0);
 
 				zfs_read(VTOZ(vp), &uio, 0, NULL);
 				// Consume as many bytes as we read
-				*spaceused += roomforvalue - zfs_uio_resid(&uio);
+				*spaceused += roomforvalue -
+				    zfs_uio_resid(&uio);
 				// Set the valuelen, should this be the full
 				// value or what we would need?
 				// That is how the names work.
@@ -2626,7 +2629,8 @@ get_reparse_point(PDEVICE_OBJECT DeviceObject, PIRP Irp,
 			iov.iov_len = size;
 
 			zfs_uio_t uio;
-			zfs_uio_iovec_init(&uio, &iov, 1, 0, UIO_SYSSPACE, size, 0);
+			zfs_uio_iovec_init(&uio, &iov, 1, 0, UIO_SYSSPACE,
+			    size, 0);
 			err = zfs_readlink(vp, &uio, NULL);
 
 			if (outlen < zp->z_size)
@@ -2990,13 +2994,14 @@ query_directory_FileFullDirectoryInformation(PDEVICE_OBJECT DeviceObject,
 	// Did last call complete listing?
 	if (zccb->dir_eof)
 		return (STATUS_NO_MORE_FILES);
-        struct iovec iov;
+	struct iovec iov;
 	void *SystemBuffer = MapUserBuffer(Irp);
-        iov.iov_base = (void *)SystemBuffer;
-        iov.iov_len = IrpSp->Parameters.QueryDirectory.Length;
+	iov.iov_base = (void *)SystemBuffer;
+	iov.iov_len = IrpSp->Parameters.QueryDirectory.Length;
 
-        zfs_uio_t uio;
-        zfs_uio_iovec_init(&uio, &iov, 1, zccb->uio_offset, UIO_SYSSPACE, IrpSp->Parameters.QueryDirectory.Length, 0);
+	zfs_uio_t uio;
+	zfs_uio_iovec_init(&uio, &iov, 1, zccb->uio_offset, UIO_SYSSPACE,
+	    IrpSp->Parameters.QueryDirectory.Length, 0);
 
 	// Grab the root zp
 	zmo = DeviceObject->DeviceExtension;
@@ -3057,7 +3062,8 @@ query_directory_FileFullDirectoryInformation(PDEVICE_OBJECT DeviceObject,
 
 		// Set correct buffer size returned.
 		Irp->IoStatus.Information =
-		    IrpSp->Parameters.QueryDirectory.Length - zfs_uio_resid(&uio);
+		    IrpSp->Parameters.QueryDirectory.Length -
+		    zfs_uio_resid(&uio);
 
 		dprintf("dirlist information in %d out size %d\n",
 		    IrpSp->Parameters.QueryDirectory.Length,
@@ -3439,9 +3445,9 @@ fs_read(PDEVICE_OBJECT DeviceObject, PIRP Irp, PIO_STACK_LOCATION IrpSp)
 	} // !nocache
 
 
-        struct iovec iov;
-        iov.iov_base = (void *)SystemBuffer;
-        iov.iov_len = bufferLength;
+	struct iovec iov;
+	iov.iov_base = (void *)SystemBuffer;
+	iov.iov_len = bufferLength;
 
         zfs_uio_t uio;
         zfs_uio_iovec_init(&uio, &iov, 1, byteOffset.QuadPart, UIO_SYSSPACE, bufferLength, 0);
@@ -3680,12 +3686,13 @@ fs_write(PDEVICE_OBJECT DeviceObject, PIRP Irp, PIO_STACK_LOCATION IrpSp)
 		}
 	}
 
-        struct iovec iov;
-        iov.iov_base = (void *)SystemBuffer;
-        iov.iov_len = bufferLength;
+	struct iovec iov;
+	iov.iov_base = (void *)SystemBuffer;
+	iov.iov_len = bufferLength;
 
-        zfs_uio_t uio;
-        zfs_uio_iovec_init(&uio, &iov, 1, byteOffset.QuadPart, UIO_SYSSPACE, bufferLength, 0);
+	zfs_uio_t uio;
+	zfs_uio_iovec_init(&uio, &iov, 1, byteOffset.QuadPart, UIO_SYSSPACE,
+	    bufferLength, 0);
 
 	// dprintf("%s: offset %llx size %lx\n", __func__,
 	// byteOffset.QuadPart, bufferLength);
@@ -4541,6 +4548,11 @@ _Function_class_(DRIVER_DISPATCH)
 				dprintf("KSTAT_IOC_WRITE\n");
 				Status = spl_kstat_write(DeviceObject, Irp,
 				    IrpSp);
+				break;
+			case ZPOOL_GET_SIZE_STATS:
+				dprintf("ZPOOL_GET_SIZE_STATS\n");
+				Status = zpool_get_size_stats(DeviceObject,
+				    Irp, IrpSp);
 				break;
 			default:
 				dprintf("**** unknown Windows IOCTL: 0x%lx\n",

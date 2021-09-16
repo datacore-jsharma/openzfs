@@ -1035,3 +1035,70 @@ zvol_fini(void)
 	zvol_fini_impl();
 	taskq_destroy(zvol_taskq);
 }
+
+/* Returns 1 on failure; Returns 0 on success */
+int
+fetch_zpool_stats(zpool_size_stats *zstats) {
+	int ret = 1;
+
+	// If 'zpool/zvol' name is provided, truncating it to zpool name only
+	char *slash = strchr(zstats->zpool_name, '/');
+	if (slash)
+		*slash = '\0';
+
+	mutex_enter(&spa_namespace_lock);
+	spa_t *spa;
+	if ((spa = spa_lookup(zstats->zpool_name)) != NULL) {
+		mutex_enter(&spa->spa_props_lock);
+		metaslab_class_t *mc = spa_normal_class(spa);
+
+		zstats->alloc = metaslab_class_get_alloc(mc);
+		zstats->alloc +=
+		    metaslab_class_get_alloc(spa_special_class(spa));
+		zstats->alloc +=
+		    metaslab_class_get_alloc(spa_dedup_class(spa));
+
+		zstats->size = metaslab_class_get_space(mc);
+		zstats->size +=
+		    metaslab_class_get_space(spa_special_class(spa));
+		zstats->size += metaslab_class_get_space(spa_dedup_class(spa));
+		mutex_exit(&spa->spa_props_lock);
+		ret = 0;
+	}
+	mutex_exit(&spa_namespace_lock);
+	return (ret);
+}
+
+extern zvol_state_t *wzvol_find_target(uint8_t targetid, uint8_t lun);
+extern void wzvol_unlock_target(zvol_state_t *zv);
+
+NTSTATUS
+zpool_get_size_stats(PDEVICE_OBJECT DeviceObject, PIRP Irp,
+    PIO_STACK_LOCATION IrpSp)
+{
+	if (IrpSp->Parameters.DeviceIoControl.OutputBufferLength <
+	    sizeof (zpool_size_stats)) {
+		Irp->IoStatus.Information = sizeof (zpool_size_stats);
+		return (STATUS_BUFFER_TOO_SMALL);
+	}
+
+	zpool_size_stats *zpool_stats =
+	    (zpool_size_stats *)Irp->AssociatedIrp.SystemBuffer;
+	if (!zpool_stats)
+		return (STATUS_INVALID_PARAMETER);
+
+	zvol_state_t *zv = NULL;
+	zv = wzvol_find_target(zpool_stats->targetid, zpool_stats->lun);
+	if (zv == NULL)
+		return (STATUS_INVALID_PARAMETER);
+
+	size_t len = sizeof (zpool_stats->zpool_name);
+	strncpy_s(zpool_stats->zpool_name, len, zv->zv_name, len - 1);
+	wzvol_unlock_target(zv);
+
+	if (fetch_zpool_stats(zpool_stats))
+		return (STATUS_NOT_FOUND);
+
+	Irp->IoStatus.Information = sizeof (zpool_size_stats);
+	return (STATUS_SUCCESS);
+}
