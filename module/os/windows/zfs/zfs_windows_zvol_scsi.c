@@ -143,7 +143,7 @@ wzvol_lock_target(zvol_state_t *zv)
 	return (FALSE);
 }
 
-static inline void
+void
 wzvol_unlock_target(zvol_state_t *zv)
 {
 	wzvolContext* zvc = (pwzvolContext)zv->zv_zso->zso_target_context;
@@ -222,7 +222,7 @@ wzvol_assign_targetid(zvol_state_t *zv)
  * note: find_target will lock the zv's remove lock. caller
  * is responsible to unlock_target if a non-NULL zv pointer is returned
  */
-static inline zvol_state_t *
+zvol_state_t *
 wzvol_find_target(uint8_t targetid, uint8_t lun)
 {
 	wzvolContext *zv_targets = STOR_wzvolDriverInfo.zvContextArray;

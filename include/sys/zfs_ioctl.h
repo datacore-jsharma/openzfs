@@ -524,6 +524,18 @@ typedef struct zfs_useracct {
 	uint64_t zu_space;
 } zfs_useracct_t;
 
+#define	ZPOOL_GET_SIZE_STATS	CTL_CODE(ZFSIOCTL_TYPE, 0xFFF,     \
+	METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+// Input/Output for IOCTL - ZPOOL_GET_SIZE_STATS
+typedef struct {
+	uint8_t targetid;
+	uint8_t lun;
+	char zpool_name[MAXNAMELEN];
+	uint64_t size;
+	uint64_t alloc;
+} zpool_size_stats;
+
 typedef struct
 {
     uint64_t total;
@@ -597,9 +609,9 @@ typedef struct {
     uint64_t	arcstat_l2_write_bytes;
     uint64_t	arcstat_l2_access_ps;
 
-    /*
-     * ZIL and SLOG counters
-     */
+/*
+ * ZIL and SLOG counters
+ */
     uint64_t	zil_commit_count;
     uint64_t	zil_commit_writer_count;
     uint64_t	zil_itx_count;
@@ -636,7 +648,7 @@ extern void zfs_unmount_snap(const char *);
 extern void zfs_destroy_unmount_origin(const char *);
 extern int getzfsvfs_impl(struct objset *, struct zfsvfs **);
 extern int getzfsvfs(const char *, struct zfsvfs **);
-extern void latency_stats(uint64_t* histo, unsigned int buckets,
+extern void latency_stats(uint64_t *histo, unsigned int buckets,
     stat_pair* lat);
 
 enum zfsdev_state_type {
