@@ -102,6 +102,8 @@ procfs_list_install(const char *module,
     size_t procfs_list_node_off)
 {
 	kstat_t *procfs_kstat;
+	char *fullmod = module;
+	char combined[KSTAT_STRLEN];
 
 	mutex_init(&procfs_list->pl_lock, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&procfs_list->pl_list,
@@ -113,7 +115,15 @@ procfs_list_install(const char *module,
 	procfs_list->pl_next_id = 1;
 	procfs_list->pl_node_offset = procfs_list_node_off;
 
-	procfs_kstat =  kstat_create(module, 0, name, submodule,
+	// Unfortunately, "submodule" (ks_class) is not used when
+	// considering unique names. Best way around that is to
+	// make "module" be "module/submodule". Ie "zfs/poolname".
+	if (submodule != NULL) {
+		snprintf(combined, sizeof (combined), "%s/%s", module, submodule);
+		fullmod = combined;
+	}
+
+	procfs_kstat =  kstat_create(fullmod, 0, name, submodule,
 	    KSTAT_TYPE_RAW, 0, KSTAT_FLAG_VIRTUAL);
 
 	if (procfs_kstat) {
@@ -124,8 +134,9 @@ procfs_list_install(const char *module,
 		kstat_set_seq_raw_ops(procfs_kstat, show_header,
 		    procfs_list_data, procfs_list_addr);
 		kstat_install(procfs_kstat);
-		procfs_list->pl_private = procfs_kstat;
 	}
+
+	procfs_list->pl_private = procfs_kstat;
 }
 
 void
@@ -137,7 +148,8 @@ void
 procfs_list_destroy(procfs_list_t *procfs_list)
 {
 	ASSERT(list_is_empty(&procfs_list->pl_list));
-	kstat_delete(procfs_list->pl_private);
+	if (procfs_list->pl_private != NULL)
+		kstat_delete(procfs_list->pl_private);
 	list_destroy(&procfs_list->pl_list);
 	mutex_destroy(&procfs_list->pl_lock);
 }
