@@ -21,14 +21,16 @@
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/removal/removal.kshlib
 
-TMPDIR=${TMPDIR:-$TEST_BASE_DIR}
-log_must mkfile 1g $TMPDIR/dsk1
-log_must mkfile 1g $TMPDIR/dsk2
+#$TMPDIR=${TMPDIR:-$TEST_BASE_DIR}
+#$log_must mkfile 1g $TMPDIR/dsk1
+#$log_must mkfile 1g $TMPDIR/dsk2
+TMPDIRDISK1=PHYSICALDRIVE4
+TMPDIRDISK2=PHYSICALDRIVE5
 
 function cleanup
 {
 	default_cleanup_noexit
-	log_must rm -f $TMPDIR/dsk1 $TMPDIR/dsk2
+	#log_must rm -f $TMPDIR/dsk1 $TMPDIR/dsk2
 }
 
 default_setup_noexit "$DISKS"
@@ -36,10 +38,10 @@ log_onexit cleanup
 
 function callback
 {
-	log_mustnot zpool attach -f $TESTPOOL $TMPDIR/dsk1 $TMPDIR/dsk2
+	log_mustnot zpool attach -f $TESTPOOL $TMPDIRDISK1 $TMPDIRDISK2
 	log_mustnot zpool add -f $TESTPOOL \
-	    raidz $TMPDIR/dsk1 $TMPDIR/dsk2
-	log_must zpool add -f $TESTPOOL $TMPDIR/dsk1
+	    raidz $TMPDIRDISK1 $TMPDIRDISK2
+	log_must zpool add -f $TESTPOOL $TMPDIRDISK1
 	return 0
 }
 

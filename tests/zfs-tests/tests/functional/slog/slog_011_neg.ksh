@@ -46,13 +46,13 @@ verify_runnable "global"
 
 log_assert "Offline and online a log device passes."
 log_onexit cleanup
-log_must setup
+#log_must setup
 
 for type in "" "mirror" "raidz" "raidz2"
 do
 	for spare in "" "spare"
 	do
-		log_must zpool create $TESTPOOL $type $VDEV $spare $SDEV \
+		log_must zpool create -f $TESTPOOL $type $VDEV $spare $SDEV \
 			log mirror $LDEV mirror $LDEV2
 
 		ldev=$(random_get $LDEV $LDEV2)

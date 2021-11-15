@@ -46,7 +46,7 @@ verify_runnable "global"
 
 log_assert "Adding a log device to normal pool works."
 log_onexit cleanup
-log_must setup
+#log_must setup
 
 for type in "" "mirror" "raidz" "raidz2"
 do
@@ -54,8 +54,8 @@ do
 	do
 		for logtype in "" "mirror"
 		do
-			log_must zpool create $TESTPOOL $type $VDEV $spare $SDEV
-			log_must zpool add $TESTPOOL log $logtype $LDEV
+			log_must zpool create -f $TESTPOOL $type $VDEV $spare $SDEV
+			log_must zpool add -f $TESTPOOL log $logtype $LDEV
 			log_must display_status $TESTPOOL
 			typeset ldev=$(random_get $LDEV)
 			log_must verify_slog_device \

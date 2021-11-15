@@ -53,6 +53,7 @@ function cleanup
 	#
 	# Ensure we don't leave disks in the offline state
 	#
+	echo 'cleanup'
 	for disk in $DISKLIST; do
 		log_must zpool online $TESTPOOL $disk
 		check_state $TESTPOOL $disk "online"
@@ -62,7 +63,7 @@ function cleanup
 
 	done
 
-	kill $killpid >/dev/null 2>&1
+	#kill $killpid >/dev/null 2>&1
 	[[ -e $TESTDIR ]] && log_must rm -rf $TESTDIR/*
 }
 
@@ -70,8 +71,8 @@ log_assert "Turning both disks offline should fail."
 
 log_onexit cleanup
 
-file_trunc -f $((64 * 1024 * 1024)) -b 8192 -c 0 -r $TESTDIR/$TESTFILE1 &
-typeset killpid="$! "
+#file_trunc -f $((64 * 1024 * 1024)) -b 8192 -c 0 -r $TESTDIR/$TESTFILE1 &
+#typeset killpid="$! "
 
 disks=($DISKLIST)
 
@@ -79,13 +80,14 @@ disks=($DISKLIST)
 # The setup script will give us either a mirror or a raidz. The former can have
 # all but one vdev offlined, whereas with raidz there can be only one.
 #
-pooltype='mirror'
+pooltype='raidz'
 zpool list -v $TESTPOOL | grep raidz >/dev/null 2>&1 && pooltype='raidz'
 
 typeset -i i=0
 while [[ $i -lt ${#disks[*]} ]]; do
 	typeset -i j=0
 	if [[ $pooltype = 'mirror' ]]; then
+		echo 'test mirror'
 		# Hold one disk online, verify the others can be offlined.
 		log_must zpool online $TESTPOOL ${disks[$i]}
 		check_state $TESTPOOL ${disks[$i]} "online" || \
@@ -103,6 +105,7 @@ while [[ $i -lt ${#disks[*]} ]]; do
 			((j++))
 		done
 	elif [[ $pooltype = 'raidz' ]]; then
+		echo 'test raidz'
 		# Hold one disk offline, verify the others can't be offlined.
 		log_must zpool offline $TESTPOOL ${disks[$i]}
 		check_state $TESTPOOL ${disks[$i]} "offline" || \
@@ -128,10 +131,10 @@ while [[ $i -lt ${#disks[*]} ]]; do
 	((i++))
 done
 
-log_must kill $killpid
+#log_must kill $killpid
 sync
 
 typeset dir=$(get_device_dir $DISKS)
-verify_filesys "$TESTPOOL" "$TESTPOOL/$TESTFS" "$dir"
+#verify_filesys "$TESTPOOL" "$TESTPOOL/$TESTFS" "$dir"
 
 log_pass

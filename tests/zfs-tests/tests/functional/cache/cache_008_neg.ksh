@@ -52,7 +52,7 @@ for type in "" "mirror" "raidz" "raidz2"
 do
 	for cachetype in "mirror" "raidz" "raidz1" "raidz2"
 	do
-		log_must zpool create $TESTPOOL $type $VDEV \
+		log_must zpool create -f $TESTPOOL $type $VDEV \
 			cache $LDEV
 
 		log_mustnot zpool add $TESTPOOL cache $cachetype $LDEV2

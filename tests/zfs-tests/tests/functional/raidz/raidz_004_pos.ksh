@@ -21,21 +21,21 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-
-#
-# Copyright (c) 2013, 2016 by Delphix. All rights reserved.
+# Copyright (c) 2020 by vStack. All rights reserved.
 #
 
 . $STF_SUITE/include/libtest.shlib
-. $STF_SUITE/tests/functional/slog/slog.cfg
 
-verify_runnable "global"
+#
+# DESCRIPTION:
+#	Call the raidz_test tool with -S and -e to test all supported raidz
+#	implementations with expanded map and zero reflow offset.
+#	This options will test several raidz block geometries and several zio
+#	parameters that affect raidz block layout. Data reconstruction performs
+#	all combinations of failed disks. Wall time is set to 5min, but actual
+#	runtime might be longer.
+#
 
-#if ! verify_slog_support ; then
-#	log_unsupported "This system doesn't support separate intent logs"
-#fi
+log_must raidz_test -S -e -r 0 -t 60
 
-log_pass
+log_pass "raidz_test parameter sweep test with expanded map succeeded."

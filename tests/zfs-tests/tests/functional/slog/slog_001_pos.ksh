@@ -45,7 +45,7 @@ verify_runnable "global"
 
 log_assert "Creating a pool with a log device succeeds."
 log_onexit cleanup
-log_must setup
+#log_must setup
 
 for type in "" "mirror" "raidz" "raidz2"
 do
@@ -53,7 +53,7 @@ do
 	do
 		for logtype in "" "mirror"
 		do
-			log_must zpool create $TESTPOOL $type $VDEV \
+			log_must zpool create -f $TESTPOOL $type $VDEV \
 				$spare $SDEV log $logtype $LDEV
 			log_must display_status $TESTPOOL
 

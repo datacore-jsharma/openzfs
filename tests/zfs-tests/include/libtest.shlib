@@ -3090,19 +3090,22 @@ function random_get
 #
 function verify_slog_support
 {
-	typeset dir=$TEST_BASE_DIR/disk.$$
+	#typeset dir=$TEST_BASE_DIR/disk.$$
+	echo $DISKS | read DISK0 DISK1 DISK2
 	typeset pool=foo.$$
-	typeset vdev=$dir/a
-	typeset sdev=$dir/b
+	#typeset vdev=$dir/a
+	#typeset sdev=$dir/b
+	typeset vdev=$DISK0
+	typeset sdev=$DISK1
 
-	mkdir -p $dir
-	mkfile $MINVDEVSIZE $vdev $sdev
+	#mkdir -p $dir
+	#mkfile $MINVDEVSIZE $vdev $sdev
 
 	typeset -i ret=0
 	if ! zpool create -n $pool $vdev log $sdev > /dev/null 2>&1; then
 		ret=1
 	fi
-	rm -r $dir
+	#rm -r $dir
 
 	return $ret
 }
@@ -3851,7 +3854,8 @@ function set_tunable64
 #
 function set_tunable32
 {
-	set_tunable_impl "$1" "$2" W
+	#set_tunable_impl "$1" "$2" W
+	log_must /mnt/c/zfs-test-suite/ZFS_Binaries/Release/kstat -w zfs:0:tunable:$1=$2
 }
 
 function set_tunable_impl

@@ -21,7 +21,7 @@
 #
 
 . $STF_SUITE/include/libtest.shlib
-. $STF_SUITE/tests/functional/replacement/replacement.cfg
+#. $STF_SUITE/tests/functional/replacement/replacement.cfg
 
 #
 # DESCRIPTION:
@@ -33,21 +33,25 @@
 # 2. Create a stripe/mirror pool, verify 'zpool replace -s' passes
 #
 
+#set -A VDEV_FILES "$DISKS physicaldrive4"
+set -A VDEV_FILES physicaldrive{1..4}
+SPARE_VDEV_FILE=physicaldrive5
+
 function cleanup
 {
-	log_must set_tunable32 SCAN_SUSPEND_PROGRESS \
-	    $ORIG_SCAN_SUSPEND_PROGRESS
+	#log_must set_tunable32 SCAN_SUSPEND_PROGRESS \
+	#    $ORIG_SCAN_SUSPEND_PROGRESS
 	destroy_pool $TESTPOOL1
-	rm -f ${VDEV_FILES[@]} $SPARE_VDEV_FILE
+	#rm -f ${VDEV_FILES[@]} $SPARE_VDEV_FILE
 }
 
 log_assert "Sequential resilver is not allowed for raidz vdevs"
 
-ORIG_SCAN_SUSPEND_PROGRESS=$(get_tunable SCAN_SUSPEND_PROGRESS)
+#ORIG_SCAN_SUSPEND_PROGRESS=$(get_tunable SCAN_SUSPEND_PROGRESS)
 
 log_onexit cleanup
 
-log_must truncate -s $VDEV_FILE_SIZE ${VDEV_FILES[@]} $SPARE_VDEV_FILE
+#log_must truncate -s $VDEV_FILE_SIZE ${VDEV_FILES[@]} $SPARE_VDEV_FILE
 
 # raidz[1-3]
 for vdev_type in "raidz" "raidz2" "raidz3"; do

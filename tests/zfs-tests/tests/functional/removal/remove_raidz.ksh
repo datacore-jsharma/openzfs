@@ -21,28 +21,37 @@
 . $STF_SUITE/include/libtest.shlib
 . $STF_SUITE/tests/functional/removal/removal.kshlib
 
-TMPDIR=${TMPDIR:-$TEST_BASE_DIR}
-log_must mkfile $MINVDEVSIZE $TMPDIR/dsk1
-log_must mkfile $MINVDEVSIZE $TMPDIR/dsk2
-log_must mkfile $MINVDEVSIZE $TMPDIR/dsk3
-DISKS1="$TMPDIR/dsk1"
-DISKS2="$TMPDIR/dsk2 $TMPDIR/dsk3"
-DISKS="$DISKS1 $DISKS2"
+#TMPDIR=${TMPDIR:-$TEST_BASE_DIR}
+#log_must mkfile $MINVDEVSIZE $TMPDIR/dsk1
+#log_must mkfile $MINVDEVSIZE $TMPDIR/dsk2
+#log_must mkfile $MINVDEVSIZE $TMPDIR/dsk3
+#DISKS1="$TMPDIR/dsk1"
+#DISKS2="$TMPDIR/dsk2 $TMPDIR/dsk3"
+#DISKS="$DISKS1 $DISKS2"
+
+DISK1=$(echo $DISKS | awk '{print $1}')
+DISK2=$(echo $DISKS | awk '{print $2}')
+DISK3=$(echo $DISKS | awk '{print $3}')
+DISKS1=$DISK1
+DISKS2="$DISK2 $DISK3"
 
 function cleanup
 {
 	default_cleanup_noexit
-	log_must rm -f $DISKS
+	#log_must rm -f $DISKS
 }
 
 log_must default_setup_noexit "$DISKS1 raidz $DISKS2"
 log_onexit cleanup
 
 # Attempt to remove the non raidz disk.
-log_mustnot zpool remove $TESTPOOL $TMPDIR/dsk1
+#log_mustnot zpool remove $TESTPOOL $TMPDIR/dsk1
+log_mustnot zpool remove $TESTPOOL $DISKS1
+
 
 # Attempt to remove one of the raidz disks.
-log_mustnot zpool remove $TESTPOOL $TMPDIR/dsk2
+#log_mustnot zpool remove $TESTPOOL $TMPDIR/dsk2
+log_mustnot zpool remove $TESTPOOL $DISK2
 
 # Attempt to remove the raidz.
 log_mustnot zpool remove $TESTPOOL raidz1-1

@@ -51,7 +51,7 @@ log_onexit cleanup
 
 for type in "" "mirror" "raidz" "raidz2"
 do
-	log_must zpool create $TESTPOOL $type $VDEV \
+	log_must zpool create -f $TESTPOOL $type $VDEV \
 		cache $LDEV
 	sdev=$(random_get $LDEV)
 	tdev=$(random_get $LDEV2)

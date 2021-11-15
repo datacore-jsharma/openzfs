@@ -87,7 +87,7 @@ log_onexit cleanup
 
 typeset -i i=0
 while [[ $i -lt ${#create_args[*]} ]]; do
-	log_must zpool create $TESTPOOL ${create_args[i]}
+	log_must zpool create -f $TESTPOOL ${create_args[i]}
 	check_remove $TESTPOOL "${verify_disks[i]}"
 	(( i = i + 1))
 done

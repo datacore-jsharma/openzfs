@@ -48,7 +48,7 @@ verify_runnable "global"
 function cleanup
 {
 	poolexists $TESTPOOL && destroy_pool $TESTPOOL
-	rm -f $disk0 $disk1
+	#rm -f $disk0 $disk1
 }
 
 log_assert "'zpool add <pool> <vdev> ...' can add devices to the pool."
@@ -63,9 +63,11 @@ pooldevs="${DISK0} \
 mirrordevs="\"${DISK0} ${DISK1}\""
 raidzdevs="\"${DISK0} ${DISK1}\""
 
-disk0=$TEST_BASE_DIR/disk0
-disk1=$TEST_BASE_DIR/disk1
-truncate -s $MINVDEVSIZE $disk0 $disk1
+#disk0=$TEST_BASE_DIR/disk0
+#disk1=$TEST_BASE_DIR/disk1
+#truncate -s $MINVDEVSIZE $disk0 $disk1
+disk0=physicaldrive4
+disk1=physicaldrive5
 
 typeset -i i=0
 typeset vdev
@@ -78,6 +80,7 @@ while (( $i < ${#keywords[*]} )); do
         case ${keywords[i]} in
         ""|spare)
 		for vdev in "${poolarray[@]}"; do
+			echo 'create spare pool'
 			create_pool "$TESTPOOL" "$disk0"
 			log_must poolexists "$TESTPOOL"
 			log_must zpool add -f "$TESTPOOL" ${keywords[i]} $vdev
@@ -88,6 +91,7 @@ while (( $i < ${#keywords[*]} )); do
 		;;
         mirror)
 		for vdev in "${mirrorarray[@]}"; do
+			echo 'create mirror pool'
 			create_pool "$TESTPOOL" "${keywords[i]}" \
 				"$disk0" "$disk1"
 			log_must poolexists "$TESTPOOL"
@@ -99,6 +103,7 @@ while (( $i < ${#keywords[*]} )); do
 		;;
         raidz|raidz1)
 		for vdev in "${raidzarray[@]}"; do
+			echo 'create raidz pool'
 			create_pool "$TESTPOOL" "${keywords[i]}" \
 				"$disk0" "$disk1"
 			log_must poolexists "$TESTPOOL"

@@ -74,7 +74,8 @@ case "$bps" in
 	allshifts=(12 13 17)
 	;;
 *)
-	log_fail "bytes/sector: $bps != (512|4096)"
+	# log_fail "bytes/sector: $bps != (512|4096)"
+	allshifts=(12 13 17)
 	;;
 esac
 log_note "Testing in ashift=${allshifts[0]} mode"
