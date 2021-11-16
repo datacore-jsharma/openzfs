@@ -33,6 +33,6 @@
 #	This option should make raidz_test to return non 0.
 #
 
-log_mustnot raidz_test -T
+log_mustnot $STF_PATH/raidz_test.exe -T
 
 log_pass "raidz_test detects errors as expected."

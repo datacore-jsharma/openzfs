@@ -56,19 +56,19 @@ log_onexit cleanup
 # raidz[1-3]
 for vdev_type in "raidz" "raidz2" "raidz3"; do
 	log_must zpool create -f $TESTPOOL1 $vdev_type ${VDEV_FILES[@]}
-	log_mustnot zpool replace -s $TESTPOOL1 ${VDEV_FILES[1]} \
+	log_mustnot zpool replace -f -s $TESTPOOL1 ${VDEV_FILES[1]} \
 	    $SPARE_VDEV_FILE
 	destroy_pool $TESTPOOL1
 done
 
 # stripe
-log_must zpool create $TESTPOOL1 ${VDEV_FILES[@]}
-log_must zpool replace -s $TESTPOOL1 ${VDEV_FILES[1]} $SPARE_VDEV_FILE
+log_must zpool create -f $TESTPOOL1 ${VDEV_FILES[@]}
+log_must zpool replace -f -s $TESTPOOL1 ${VDEV_FILES[1]} $SPARE_VDEV_FILE
 destroy_pool $TESTPOOL1
 
 # mirror
-log_must zpool create $TESTPOOL1 mirror ${VDEV_FILES[0]} ${VDEV_FILES[1]}
-log_must zpool replace -s $TESTPOOL1 ${VDEV_FILES[1]}  $SPARE_VDEV_FILE
+log_must zpool create -f $TESTPOOL1 mirror ${VDEV_FILES[0]} ${VDEV_FILES[1]}
+log_must zpool replace -f -s $TESTPOOL1 ${VDEV_FILES[1]}  $SPARE_VDEV_FILE
 destroy_pool $TESTPOOL1
 
 log_pass "Sequential resilver is not allowed for raidz vdevs"

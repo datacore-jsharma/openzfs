@@ -3855,7 +3855,7 @@ function set_tunable64
 function set_tunable32
 {
 	#set_tunable_impl "$1" "$2" W
-	log_must /mnt/c/zfs-test-suite/ZFS_Binaries/Release/kstat -w zfs:0:tunable:$1=$2
+	log_must $STF_PATH/kstat.exe -w zfs:0:tunable:$1=$2
 }
 
 function set_tunable_impl
