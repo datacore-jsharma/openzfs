@@ -1,0 +1,127 @@
+[DEFAULT]
+pre = setup
+quiet = False
+pre_user = root
+user = root
+timeout = 600
+post_user = root
+post = cleanup
+failsafe_user = root
+failsafe = callbacks/zfs_failsafe
+outputdir = /var/tmp/test_results
+tags = ['functional']
+
+[tests/functional/cli_root/zpool_create]
+tests = ['zpool_create_001_pos', 'zpool_create_007_neg',
+    'zpool_create_009_neg', 'zpool_create_011_neg',
+    'zpool_create_012_neg',
+    'zpool_create_017_neg','zpool_create_019_pos',
+    'zpool_create_021_pos', 'zpool_create_022_pos',
+    'zpool_create_023_neg',
+    'zpool_create_encrypted',
+    'zpool_create_features_001_pos',
+    'zpool_create_features_004_neg',
+    'zpool_create_features_005_pos']
+tags = ['functional', 'cli_root', 'zpool_create']
+
+[tests/functional/cli_root/zfs]
+tests = ['zfs_001_neg']
+tags = ['functional', 'cli_root', 'zfs']
+
+[tests/functional/zvol/zvol_cli]
+tests = ['zvol_cli_001_pos', 'zvol_cli_002_pos', 'zvol_cli_003_neg']
+tags = ['functional', 'zvol', 'zvol_cli']
+
+[tests/functional/io]
+tests = ['sync', 'psync', 'posixaio', 'mmap']
+tags = ['functional', 'io']
+
+[tests/functional/cli_root/zfs_create]
+tests = ['zfs_create_001_pos', 'zfs_create_002_pos', 'zfs_create_003_pos',
+    'zfs_create_004_pos', 'zfs_create_005_pos', 'zfs_create_006_pos',
+    'zfs_create_007_pos', 'zfs_create_008_neg', 'zfs_create_009_neg',
+    'zfs_create_010_neg', 'zfs_create_011_pos', 'zfs_create_012_pos',
+    'zfs_create_013_pos', 'zfs_create_encrypted']
+tags = ['functional', 'cli_root', 'zfs_create']
+
+[tests/functional/cli_user/zpool_list]
+tests = ['zpool_list_001_pos', 'zpool_list_002_neg']
+user =
+tags = ['functional', 'cli_user', 'zpool_list']
+
+[tests/functional/cli_user/zfs_list]
+tests = ['zfs_list_001_pos', 'zfs_list_002_pos', 'zfs_list_003_pos',
+    'zfs_list_004_neg', 'zfs_list_008_neg']
+user =
+tags = ['functional', 'cli_user', 'zfs_list']
+
+[tests/functional/cli_root/zpool_set]
+tests = ['zpool_set_001_pos']
+tags = ['functional', 'cli_root', 'zpool_set']
+
+[tests/functional/cli_root/zfs_set]
+tests = ['cache_001_pos', 'cache_002_neg',
+    'checksum_001_pos', 'compression_001_pos']
+tags = ['functional', 'cli_root', 'zfs_set']
+
+[tests/functional/cli_root/zfs_get]
+tests = ['zfs_get_001_pos', 'zfs_get_002_pos',
+    'zfs_get_005_neg', 'zfs_get_006_neg', 'zfs_get_007_neg',
+    'zfs_get_008_pos', 'zfs_get_010_neg']
+tags = ['functional', 'cli_root', 'zfs_get']
+
+[tests/functional/raidz]
+tests = ['raidz_001_neg', 'raidz_002_pos', 'raidz_003_pos', 'raidz_004_pos']
+tags = ['functional', 'raidz']
+
+[tests/functional/removal]
+pre =
+tests = ['removal_with_add', 'remove_raidz']
+tags = ['functional', 'removal']
+
+[tests/functional/refreserv]
+tests = ['refreserv_multi_raidz']
+tags = ['functional', 'refreserv']
+
+[tests/functional/replacement]
+pre =
+post=
+tests = ['rebuild_raidz']
+tags = ['functional', 'replacement']
+
+[tests/functional/cli_root/zpool_add]
+pre =
+post=
+tests = ['zpool_add_001_pos','zpool_add_010_pos']
+tags = ['functional', 'cli_root', 'zpool_add']
+
+[tests/functional/slog]
+pre =
+tests = ['slog_001_pos', 'slog_002_pos', 'slog_003_pos', 'slog_004_pos',
+    'slog_005_pos', 'slog_006_pos','slog_008_neg',
+    'slog_009_neg', 'slog_011_neg']
+tags = ['functional', 'slog']
+
+[tests/functional/cli_root/zpool_remove]
+pre =
+post=
+tests = ['zpool_remove_001_neg']
+tags = ['functional', 'cli_root', 'zpool_remove']
+
+[tests/functional/pool_names]
+tests = ['pool_names_002_neg']
+pre =
+post =
+tags = ['functional', 'pool_names']
+
+[tests/functional/cache]
+pre =
+post=
+tests = ['cache_001_pos', 'cache_002_pos', 'cache_003_pos', 'cache_004_neg',
+    'cache_005_neg','cache_007_neg', 'cache_008_neg',
+    'cache_009_pos', 'cache_011_pos']
+tags = ['functional', 'cache']
+
+[tests/functional/online_offline]
+tests = ['online_offline_002_neg']
+tags = ['functional', 'online_offline']

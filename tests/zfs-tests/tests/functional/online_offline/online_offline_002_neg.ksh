@@ -80,7 +80,7 @@ disks=($DISKLIST)
 # The setup script will give us either a mirror or a raidz. The former can have
 # all but one vdev offlined, whereas with raidz there can be only one.
 #
-pooltype='raidz'
+pooltype='mirror'
 zpool list -v $TESTPOOL | grep raidz >/dev/null 2>&1 && pooltype='raidz'
 
 typeset -i i=0
