@@ -66,9 +66,8 @@ raidzdevs="\"${DISK0} ${DISK1}\""
 #disk0=$TEST_BASE_DIR/disk0
 #disk1=$TEST_BASE_DIR/disk1
 #truncate -s $MINVDEVSIZE $disk0 $disk1
-disk0=physicaldrive4
-disk1=physicaldrive5
-
+disk0=$(echo $RAID_TEST_DISKS | awk '{print $1}')
+disk1=$(echo $RAID_TEST_DISKS | awk '{print $2}')
 typeset -i i=0
 typeset vdev
 eval set -A poolarray $pooldevs

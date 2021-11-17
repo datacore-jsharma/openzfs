@@ -34,8 +34,8 @@
 #
 
 #set -A VDEV_FILES "$DISKS physicaldrive4"
-set -A VDEV_FILES physicaldrive{1..4}
-SPARE_VDEV_FILE=physicaldrive5
+set -A VDEV_FILES $DISKS $(echo $RAID_TEST_DISKS | awk '{print $1}')
+SPARE_VDEV_FILE=$(echo $RAID_TEST_DISKS | awk '{print $2}')
 
 function cleanup
 {

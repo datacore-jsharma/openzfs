@@ -24,8 +24,8 @@
 #$TMPDIR=${TMPDIR:-$TEST_BASE_DIR}
 #$log_must mkfile 1g $TMPDIR/dsk1
 #$log_must mkfile 1g $TMPDIR/dsk2
-TMPDIRDISK1=PHYSICALDRIVE4
-TMPDIRDISK2=PHYSICALDRIVE5
+TMPDIRDISK1=$(echo $RAID_TEST_DISKS | awk '{print $1}')
+TMPDIRDISK2=$(echo $RAID_TEST_DISKS | awk '{print $2}')
 
 function cleanup
 {
