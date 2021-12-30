@@ -778,7 +778,6 @@ uint_t taskq_smtbf = UINT_MAX;    /* mean time between injected failures */
  * Schedule a task specified by func and arg into the task queue entry tqe.
  */
 #define	TQ_DO_ENQUEUE(tq, tqe, func, arg, front) {			\
-	ASSERT(MUTEX_HELD(&tq->tq_lock));				\
 	_NOTE(CONSTCOND)						\
 	if (front) {							\
 		TQ_PREPEND(tq->tq_task, tqe);				\
@@ -816,7 +815,7 @@ taskq_constructor(void *buf, void *cdrarg, int kmflags)
 	taskq_t *tq = buf;
 
 	bzero(tq, sizeof (taskq_t));
-
+	KeInitializeSpinLock(&tq->tq_spinlock);
 	mutex_init(&tq->tq_lock, NULL, MUTEX_DEFAULT, NULL);
 	rw_init(&tq->tq_threadlock, NULL, RW_DEFAULT, NULL);
 	cv_init(&tq->tq_dispatch_cv, NULL, CV_DEFAULT, NULL);
@@ -1159,7 +1158,7 @@ taskq_update_nthreads(taskq_t *tq, uint_t ncpus)
 #ifndef _WIN32
 	ASSERT(MUTEX_HELD(&cpu_lock));
 #endif
-	ASSERT(MUTEX_HELD(&tq->tq_lock));
+	//ASSERT(MUTEX_HELD(&tq->tq_lock));
 
 	/* We must be going from non-zero to non-zero; no exiting. */
 	ASSERT3U(tq->tq_nthreads_target, !=, 0);
@@ -1294,6 +1293,71 @@ system_taskq_fini(void)
 	system_taskq = NULL;
 }
 
+static taskq_ent_t*
+taskq_ent_alloc(taskq_t* tq, int flags)
+{
+    int kmflags = (flags & TQ_NOSLEEP) ? KM_NOSLEEP : KM_SLEEP;
+    taskq_ent_t* tqe;
+    clock_t wait_time;
+    clock_t	wait_rv;
+
+    //ASSERT(MUTEX_HELD(&tq->tq_lock));
+
+    /*
+     * TQ_NOALLOC allocations are allowed to use the freelist, even if
+     * we are below tq_minalloc.
+     */
+again:	if ((tqe = tq->tq_freelist) != NULL &&
+    ((flags & TQ_NOALLOC) || tq->tq_nalloc >= tq->tq_minalloc)) {
+    tq->tq_freelist = tqe->tqent_next;
+}
+else {
+    if (flags & TQ_NOALLOC)
+	return (NULL);
+
+    if (tq->tq_nalloc >= tq->tq_maxalloc) {
+	if (kmflags & KM_NOSLEEP)
+	    return (NULL);
+
+	/*
+	 * We don't want to exceed tq_maxalloc, but we can't
+	 * wait for other tasks to complete (and thus free up
+	 * task structures) without risking deadlock with
+	 * the caller.  So, we just delay for one second
+	 * to throttle the allocation rate. If we have tasks
+	 * complete before one second timeout expires then
+	 * taskq_ent_free will signal us and we will
+	 * immediately retry the allocation (reap free).
+	 */
+	wait_time = ddi_get_lbolt() + hz;
+	while (tq->tq_freelist == NULL) {
+	    tq->tq_maxalloc_wait++;
+	    //wait_rv = cv_timedwait(&tq->tq_maxalloc_cv,
+		//&tq->tq_lock, wait_time);
+	    wait_rv = cv_timedwait_spin(&tq->tq_maxalloc_cv,
+		&tq->tq_spinlock, wait_time);
+	    tq->tq_maxalloc_wait--;
+	    if (wait_rv == -1)
+		break;
+	}
+	if (tq->tq_freelist)
+	    goto again;		/* reap freelist */
+
+    }
+    //mutex_exit(&tq->tq_lock);
+    spinlock_exit(&tq->tq_spinlock);
+
+    tqe = kmem_cache_alloc(taskq_ent_cache, kmflags);
+
+    //mutex_enter(&tq->tq_lock);
+    spinlock_enter(&tq->tq_spinlock);
+    if (tqe != NULL)
+	tq->tq_nalloc++;
+}
+
+return (tqe);
+}
+
 /*
  * taskq_ent_alloc()
  *
@@ -1303,7 +1367,7 @@ system_taskq_fini(void)
  * Assumes: tq->tq_lock is held.
  */
 static taskq_ent_t *
-taskq_ent_alloc(taskq_t *tq, int flags)
+taskq_ent_alloc_mutex(taskq_t *tq, int flags)
 {
 	int kmflags = (flags & TQ_NOSLEEP) ? KM_NOSLEEP : KM_SLEEP;
 	taskq_ent_t *tqe;
@@ -1362,6 +1426,27 @@ again:	if ((tqe = tq->tq_freelist) != NULL &&
 	return (tqe);
 }
 
+static void
+taskq_ent_free(taskq_t* tq, taskq_ent_t* tqe)
+{
+    //ASSERT(MUTEX_HELD(&tq->tq_lock));
+
+    if (tq->tq_nalloc <= tq->tq_minalloc) {
+	tqe->tqent_next = tq->tq_freelist;
+	tq->tq_freelist = tqe;
+    }
+    else {
+	tq->tq_nalloc--;
+	//mutex_exit(&tq->tq_lock);
+	spinlock_exit(&tq->tq_spinlock);
+	kmem_cache_free(taskq_ent_cache, tqe);
+	spinlock_enter(&tq->tq_spinlock);
+	//mutex_enter(&tq->tq_lock);
+    }
+
+    if (tq->tq_maxalloc_wait)
+	cv_signal(&tq->tq_maxalloc_cv);
+}
 /*
  * taskq_ent_free()
  *
@@ -1371,7 +1456,7 @@ again:	if ((tqe = tq->tq_freelist) != NULL &&
  * Assumes: tq->tq_lock is held.
  */
 static void
-taskq_ent_free(taskq_t *tq, taskq_ent_t *tqe)
+taskq_ent_free_mutex(taskq_t *tq, taskq_ent_t *tqe)
 {
 	ASSERT(MUTEX_HELD(&tq->tq_lock));
 
@@ -1401,7 +1486,7 @@ taskq_ent_exists(taskq_t *tq, task_func_t func, void *arg)
 {
 	taskq_ent_t	*tqe;
 
-	ASSERT(MUTEX_HELD(&tq->tq_lock));
+	//ASSERT(MUTEX_HELD(&tq->tq_lock));
 
 	for (tqe = tq->tq_task.tqent_next; tqe != &tq->tq_task;
 	    tqe = tqe->tqent_next)
@@ -1489,12 +1574,13 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t flags)
 		/*
 		 * Enqueue the task to the underlying queue.
 		 */
-		mutex_enter(&tq->tq_lock);
-
+		//mutex_enter(&tq->tq_lock);
+		spinlock_enter(&tq->tq_spinlock);
 		TASKQ_S_RANDOM_DISPATCH_FAILURE(tq, flags);
 
 		if ((tqe = taskq_ent_alloc(tq, flags)) == NULL) {
-			mutex_exit(&tq->tq_lock);
+			//mutex_exit(&tq->tq_lock);
+			spinlock_exit(&tq->tq_spinlock);
 			return (0);
 		}
 		/* Make sure we start without any flags */
@@ -1508,7 +1594,8 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t flags)
 		} else {
 			TQ_ENQUEUE(tq, tqe, func, arg);
 		}
-		mutex_exit(&tq->tq_lock);
+		//mutex_exit(&tq->tq_lock);
+		spinlock_exit(&tq->tq_spinlock);
 		return ((taskqid_t)tqe);
 	}
 
@@ -1607,7 +1694,8 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t flags)
 	 * taskq entry to extend it in the background using backing queue
 	 * (unless we already have a taskq entry to perform that extension).
 	 */
-	mutex_enter(&tq->tq_lock);
+	//mutex_enter(&tq->tq_lock);
+	spinlock_enter(&tq->tq_spinlock);
 	if (!taskq_ent_exists(tq, taskq_bucket_extend, bucket)) {
 		if ((tqe1 = taskq_ent_alloc(tq, TQ_NOSLEEP)) != NULL) {
 			TQ_ENQUEUE_FRONT(tq, tqe1, taskq_bucket_extend, bucket);
@@ -1627,8 +1715,8 @@ taskq_dispatch(taskq_t *tq, task_func_t func, void *arg, uint_t flags)
 			TQ_STAT(bucket, tqs_nomem);
 		}
 	}
-	mutex_exit(&tq->tq_lock);
-
+	//mutex_exit(&tq->tq_lock);
+	spinlock_exit(&tq->tq_spinlock);
 	return ((taskqid_t)tqe);
 }
 
@@ -1654,14 +1742,15 @@ taskq_dispatch_ent(taskq_t *tq, task_func_t func, void *arg, uint_t flags,
 	/*
 	 * Enqueue the task to the underlying queue.
 	 */
-	mutex_enter(&tq->tq_lock);
-
+	//mutex_enter(&tq->tq_lock);
+	spinlock_enter(&tq->tq_spinlock);
 	if (flags & TQ_FRONT) {
 		TQ_ENQUEUE_FRONT(tq, tqe, func, arg);
 	} else {
 		TQ_ENQUEUE(tq, tqe, func, arg);
 	}
-	mutex_exit(&tq->tq_lock);
+	//mutex_exit(&tq->tq_lock);
+	spinlock_exit(&tq->tq_spinlock);
 }
 
 /*
@@ -1672,10 +1761,11 @@ taskq_empty(taskq_t *tq)
 {
 	boolean_t rv;
 
-	mutex_enter(&tq->tq_lock);
+	//mutex_enter(&tq->tq_lock);
+	spinlock_enter(&tq->tq_spinlock);
 	rv = (tq->tq_task.tqent_next == &tq->tq_task) && (tq->tq_active == 0);
-	mutex_exit(&tq->tq_lock);
-
+	//mutex_exit(&tq->tq_lock);
+	spinlock_exit(&tq->tq_spinlock);
 	return (rv);
 }
 
@@ -1702,10 +1792,12 @@ taskq_wait(taskq_t *tq)
 	if (tq == NULL)
 		return;
 
-	mutex_enter(&tq->tq_lock);
+	spinlock_enter(&tq->tq_spinlock);
+	//mutex_enter(&tq->tq_lock);
 	while (tq->tq_task.tqent_next != &tq->tq_task || tq->tq_active != 0)
-		cv_wait(&tq->tq_wait_cv, &tq->tq_lock);
-	mutex_exit(&tq->tq_lock);
+		cv_wait_spin(&tq->tq_wait_cv, &tq->tq_spinlock);
+	//mutex_exit(&tq->tq_lock);
+	spinlock_exit(&tq->tq_spinlock);
 
 	if (tq->tq_flags & TASKQ_DYNAMIC) {
 		taskq_bucket_t *b = tq->tq_buckets;
@@ -1760,10 +1852,12 @@ taskq_suspend(taskq_t *tq)
 	/*
 	 * Mark task queue as being suspended. Needed for taskq_suspended().
 	 */
-	mutex_enter(&tq->tq_lock);
+	//mutex_enter(&tq->tq_lock);
+	spinlock_enter(&tq->tq_spinlock);
 	ASSERT(!(tq->tq_flags & TASKQ_SUSPENDED));
 	tq->tq_flags |= TASKQ_SUSPENDED;
-	mutex_exit(&tq->tq_lock);
+	//mutex_exit(&tq->tq_lock);
+	spinlock_exit(&tq->tq_spinlock);
 }
 
 /*
@@ -1792,10 +1886,12 @@ taskq_resume(taskq_t *tq)
 			mutex_exit(&b->tqbucket_lock);
 		}
 	}
-	mutex_enter(&tq->tq_lock);
+	//mutex_enter(&tq->tq_lock);
+	spinlock_enter(&tq->tq_spinlock);
 	ASSERT(tq->tq_flags & TASKQ_SUSPENDED);
 	tq->tq_flags &= ~TASKQ_SUSPENDED;
-	mutex_exit(&tq->tq_lock);
+	//mutex_exit(&tq->tq_lock);
+	spinlock_exit(&tq->tq_spinlock);
 
 	rw_exit(&tq->tq_threadlock);
 }
@@ -1826,15 +1922,15 @@ taskq_thread_create(taskq_t *tq)
 	kthread_t	*t;
 	const boolean_t	first = (tq->tq_nthreads == 0);
 
-	ASSERT(MUTEX_HELD(&tq->tq_lock));
+	//ASSERT(MUTEX_HELD(&tq->tq_lock));
 	ASSERT(tq->tq_flags & TASKQ_CHANGING);
 	ASSERT(tq->tq_nthreads < tq->tq_nthreads_target);
 	ASSERT(!(tq->tq_flags & TASKQ_THREAD_CREATED));
 
 	tq->tq_flags |= TASKQ_THREAD_CREATED;
 	tq->tq_active++;
-	mutex_exit(&tq->tq_lock);
-
+	//mutex_exit(&tq->tq_lock);
+	spinlock_exit(&tq->tq_spinlock);
 	/*
 	 * With TASKQ_DUTY_CYCLE the new thread must have an LWP
 	 * as explained in ../disp/sysdc.c (for the msacct data).
@@ -1859,7 +1955,8 @@ taskq_thread_create(taskq_t *tq)
 	}
 
 	if (!first) {
-		mutex_enter(&tq->tq_lock);
+		//mutex_enter(&tq->tq_lock);
+		spinlock_enter(&tq->tq_spinlock);
 		return;
 	}
 
@@ -1870,22 +1967,44 @@ taskq_thread_create(taskq_t *tq)
 	 */
 	if (tq->tq_flags & TASKQ_THREADS_CPU_PCT) {
 #ifdef _WIN32
-		mutex_enter(&tq->tq_lock);
+		//mutex_enter(&tq->tq_lock);
+		spinlock_enter(&tq->tq_spinlock);
 		taskq_update_nthreads(tq, max_ncpus);
-		mutex_exit(&tq->tq_lock);
+		//mutex_exit(&tq->tq_lock);
+		spinlock_exit(&tq->tq_spinlock);
 #else
 		taskq_cpupct_install(tq, t->t_cpupart);
 #endif
 	}
-	mutex_enter(&tq->tq_lock);
-
+	//mutex_enter(&tq->tq_lock);
+	spinlock_enter(&tq->tq_spinlock);
 	/* Wait until we can service requests. */
 	while (tq->tq_nthreads != tq->tq_nthreads_target &&
 	    tq->tq_nthreads < TASKQ_CREATE_ACTIVE_THREADS) {
-		cv_wait(&tq->tq_wait_cv, &tq->tq_lock);
+		cv_wait_spin(&tq->tq_wait_cv, &tq->tq_spinlock);
 	}
 }
 
+static clock_t
+taskq_thread_wait_spin(taskq_t* tq, kspinlock_t* sl, kcondvar_t* cv,
+    callb_cpr_t* cprinfo, clock_t timeout)
+{
+    clock_t ret = 0;
+
+    //if (!(tq->tq_flags & TASKQ_CPR_SAFE)) {
+	//CALLB_CPR_SAFE_BEGIN(cprinfo);
+    //}
+    if ((signed long)timeout < 0)
+	cv_wait_spin(cv, sl);
+    else
+	ret = cv_reltimedwait_spin(cv, sl, timeout, TR_CLOCK_TICK);
+
+//    if (!(tq->tq_flags & TASKQ_CPR_SAFE)) {
+	//CALLB_CPR_SAFE_END(cprinfo, mx);
+    //}
+
+    return (ret);
+}
 /*
  * Common "sleep taskq thread" function, which handles CPR stuff, as well
  * as giving a nice common point for debuggers to find inactive threads.
@@ -1995,7 +2114,8 @@ taskq_thread(void *arg)
 	    tq->tq_name);
 
 	tsd_set(taskq_tsd, tq);
-	mutex_enter(&tq->tq_lock);
+	//mutex_enter(&tq->tq_lock);
+	spinlock_enter(&tq->tq_spinlock);
 	thread_id = ++tq->tq_nthreads;
 	ASSERT(tq->tq_flags & TASKQ_THREAD_CREATED);
 	ASSERT(tq->tq_flags & TASKQ_CHANGING);
@@ -2033,7 +2153,7 @@ taskq_thread(void *arg)
 				}
 
 				/* Wait for higher thread_ids to exit */
-				(void) taskq_thread_wait(tq, &tq->tq_lock,
+				(void) taskq_thread_wait_spin(tq, &tq->tq_spinlock,
 				    &tq->tq_exit_cv, &cprinfo, -1);
 				continue;
 			}
@@ -2058,7 +2178,7 @@ taskq_thread(void *arg)
 		if ((tqe = tq->tq_task.tqent_next) == &tq->tq_task) {
 			if (--tq->tq_active == 0)
 				cv_broadcast(&tq->tq_wait_cv);
-			(void) taskq_thread_wait(tq, &tq->tq_lock,
+			(void) taskq_thread_wait_spin(tq, &tq->tq_spinlock,
 			    &tq->tq_dispatch_cv, &cprinfo, -1);
 			tq->tq_active++;
 			continue;
@@ -2066,7 +2186,8 @@ taskq_thread(void *arg)
 
 		tqe->tqent_prev->tqent_next = tqe->tqent_next;
 		tqe->tqent_next->tqent_prev = tqe->tqent_prev;
-		mutex_exit(&tq->tq_lock);
+		//mutex_exit(&tq->tq_lock);
+		spinlock_exit(&tq->tq_spinlock);
 
 		/*
 		 * For prealloc'd tasks, we don't free anything.  We
@@ -2115,7 +2236,8 @@ taskq_thread(void *arg)
 			mutex_exit(&tqd_delay_lock);
 		}
 
-		mutex_enter(&tq->tq_lock);
+		//mutex_enter(&tq->tq_lock);
+		spinlock_enter(&tq->tq_spinlock);
 		tq->tq_totaltime += end - start;
 		tq->tq_executed++;
 
@@ -2144,9 +2266,11 @@ taskq_thread(void *arg)
 		cv_broadcast(&tq->tq_wait_cv);
 	}
 
+	spinlock_exit(&tq->tq_spinlock);
+
 	tsd_set(taskq_tsd, NULL);
 
-	CALLB_CPR_EXIT(&cprinfo);
+	//CALLB_CPR_EXIT(&cprinfo);
 	thread_exit();
 
 }
@@ -2286,9 +2410,11 @@ taskq_d_thread(taskq_ent_t *tqe)
 			TQ_STAT(bucket, tqs_tdeaths);
 			cv_signal(&bucket->tqbucket_cv);
 			tqe->tqent_thread = NULL;
-			mutex_enter(&tq->tq_lock);
+			//mutex_enter(&tq->tq_lock);
+			spinlock_enter(&tq->tq_spinlock);
 			tq->tq_tdeaths++;
-			mutex_exit(&tq->tq_lock);
+			spinlock_exit(&tq->tq_spinlock);
+			//mutex_exit(&tq->tq_lock);
 			CALLB_CPR_EXIT(&cprinfo);
 			kmem_cache_free(taskq_ent_cache, tqe);
 			thread_exit();
@@ -2370,7 +2496,11 @@ static taskq_t *
 taskq_create_common(const char *name, int instance, int nthreads, pri_t pri,
     int minalloc, int maxalloc, proc_t *proc, uint_t dc, uint_t flags)
 {
-	taskq_t *tq = kmem_cache_alloc(taskq_cache, KM_SLEEP);
+	//taskq_t *tq = kmem_cache_alloc(taskq_cache, KM_SLEEP);
+   	taskq_t * tq = (taskq_t*)ExAllocatePoolWithTag(
+	    NonPagedPoolNx, sizeof(taskq_t), 'tqsp');
+
+	taskq_constructor(tq, NULL, 0);
 #ifdef _WIN32
 	uint_t ncpus = max_ncpus;
 #else
@@ -2475,7 +2605,8 @@ taskq_create_common(const char *name, int instance, int nthreads, pri_t pri,
 		tq->tq_threadlist = kmem_alloc(
 		    sizeof (kthread_t *) * max_nthreads, KM_SLEEP);
 
-	mutex_enter(&tq->tq_lock);
+	//mutex_enter(&tq->tq_lock);
+	spinlock_enter(&tq->tq_spinlock);
 	if (flags & TASKQ_PREPOPULATE) {
 		while (minalloc-- > 0)
 			taskq_ent_free(tq, taskq_ent_alloc(tq, TQ_SLEEP));
@@ -2496,7 +2627,8 @@ taskq_create_common(const char *name, int instance, int nthreads, pri_t pri,
 	 * enough threads to be able to process requests.
 	 */
 	taskq_thread_create(tq);
-	mutex_exit(&tq->tq_lock);
+	spinlock_exit(&tq->tq_spinlock);
+	//mutex_exit(&tq->tq_lock);
 
 	if (flags & TASKQ_DYNAMIC) {
 		taskq_bucket_t *bucket = kmem_zalloc(sizeof (taskq_bucket_t) *
@@ -2604,7 +2736,8 @@ taskq_destroy(taskq_t *tq)
 	 */
 	taskq_wait(tq);
 
-	mutex_enter(&tq->tq_lock);
+	//mutex_enter(&tq->tq_lock);
+	spinlock_enter(&tq->tq_spinlock);
 	ASSERT((tq->tq_task.tqent_next == &tq->tq_task) &&
 	    (tq->tq_active == 0));
 
@@ -2616,18 +2749,23 @@ taskq_destroy(taskq_t *tq)
 	cv_broadcast(&tq->tq_exit_cv);
 
 	while (tq->tq_nthreads != 0)
-		cv_wait(&tq->tq_wait_cv, &tq->tq_lock);
+		cv_wait_spin(&tq->tq_wait_cv, &tq->tq_spinlock);
 
+	
 	if (tq->tq_nthreads_max != 1)
-		kmem_free(tq->tq_threadlist, sizeof (kthread_t *) *
-		    tq->tq_nthreads_max);
+	{
+	    spinlock_exit(&tq->tq_spinlock);
+	    kmem_free(tq->tq_threadlist, sizeof(kthread_t*) *
+		tq->tq_nthreads_max);
+	    spinlock_enter(&tq->tq_spinlock);
+	}
 
 	tq->tq_minalloc = 0;
 	while (tq->tq_nalloc != 0)
 		taskq_ent_free(tq, taskq_ent_alloc(tq, TQ_SLEEP));
 
-	mutex_exit(&tq->tq_lock);
-
+	//mutex_exit(&tq->tq_lock);
+	spinlock_exit(&tq->tq_spinlock);
 	/*
 	 * Mark each bucket as closing and wakeup all sleeping threads.
 	 */
@@ -2683,7 +2821,10 @@ taskq_destroy(taskq_t *tq)
 	tq->tq_tasks = 0;
 	tq->tq_maxtasks = 0;
 	tq->tq_executed = 0;
-	kmem_cache_free(taskq_cache, tq);
+	//kmem_cache_free(taskq_cache, tq);
+	
+	taskq_destructor(tq, NULL);
+	ExFreePoolWithTag(tq, 'tqsp');
 }
 
 /*
@@ -2711,25 +2852,28 @@ taskq_bucket_extend(void *arg)
 		return;
 	}
 
-	mutex_enter(&tq->tq_lock);
-
+	//mutex_enter(&tq->tq_lock);
+	spinlock_enter(&tq->tq_spinlock);
 	/*
 	 * Observe global taskq limits on the number of threads.
 	 */
 	if (tq->tq_tcreates++ - tq->tq_tdeaths > tq->tq_maxsize) {
 		tq->tq_tcreates--;
-		mutex_exit(&tq->tq_lock);
+		//mutex_exit(&tq->tq_lock);
+		spinlock_exit(&tq->tq_spinlock);
 		return;
 	}
-	mutex_exit(&tq->tq_lock);
-
+	//mutex_exit(&tq->tq_lock);
+	spinlock_exit(&tq->tq_spinlock);
 	tqe = kmem_cache_alloc(taskq_ent_cache, KM_NOSLEEP);
 
 	if (tqe == NULL) {
-		mutex_enter(&tq->tq_lock);
+		//mutex_enter(&tq->tq_lock);
+		spinlock_enter(&tq->tq_spinlock);
 		TQ_STAT(b, tqs_nomem);
 		tq->tq_tcreates--;
-		mutex_exit(&tq->tq_lock);
+		//mutex_exit(&tq->tq_lock);
+		spinlock_exit(&tq->tq_spinlock);
 		return;
 	}
 

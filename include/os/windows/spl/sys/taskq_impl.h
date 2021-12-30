@@ -38,6 +38,7 @@
 #include <sys/vmem.h>
 #include <sys/list.h>
 #include <sys/kstat.h>
+#include <sys/spinlock.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -115,6 +116,7 @@ struct taskq_bucket {
 
 struct taskq {
 	char		tq_name[TASKQ_NAMELEN + 1];
+	kspinlock_t	tq_spinlock;
 	kmutex_t	tq_lock;
 	krwlock_t	tq_threadlock;
 	kcondvar_t	tq_dispatch_cv;

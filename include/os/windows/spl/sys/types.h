@@ -44,7 +44,7 @@ typedef unsigned char			uchar_t;
 typedef unsigned int			uint_t;
 typedef unsigned int			uint32_t;
 typedef unsigned short			ushort_t;
-typedef void *spinlock_t;
+//typedef void *spinlock_t;
 typedef long long			offset_t;
 typedef long long			off_t;
 typedef struct timespec			timestruc_t; /* definition per SVr4 */

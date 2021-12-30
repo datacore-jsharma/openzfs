@@ -73,6 +73,8 @@ int cv_timedwait_hires(kcondvar_t *cvp, struct kmutex *mp,
 #define	cv_wait(cvp, mp)        \
 	(void) spl_cv_wait((cvp), (mp), PRIBIO, #cvp)
 
+#define	cv_wait_spin(cvp, mp)        \
+	(void) spl_cv_wait_spin((cvp), (mp), PRIBIO, #cvp)
 /*
  * Linux provides a cv_wait_io so the schedular will know why we block.
  * find OSX equivalent?
@@ -85,6 +87,9 @@ int cv_timedwait_hires(kcondvar_t *cvp, struct kmutex *mp,
 
 #define	cv_timedwait(cvp, mp, tim)      \
 	spl_cv_timedwait((cvp), (mp), (tim), PRIBIO, #cvp)
+
+#define	cv_timedwait_spin(cvp, mp, tim)      \
+	spl_cv_timedwait_spin((cvp), (mp), (tim), PRIBIO, #cvp)
 
 #define	cv_timedwait_io(cvp, mp, tim)   \
 	spl_cv_timedwait((cvp), (mp), (tim), PRIBIO, #cvp)
@@ -112,6 +117,9 @@ int cv_timedwait_hires(kcondvar_t *cvp, struct kmutex *mp,
 #define	TICK_TO_NSEC(tick) ((hrtime_t)(tick) * 1000000000 / hz)
 #define	cv_reltimedwait(cvp, mp, tim, type) \
 	cv_timedwait_hires((cvp), (mp), TICK_TO_NSEC((tim)), 0, 0)
+
+#define	cv_reltimedwait_spin(cvp, mp, tim, type) \
+	cv_timedwait_hires_spin((cvp), (mp), TICK_TO_NSEC((tim)), 0, 0)
 
 #define	cv_timedwait_idle_hires(cvp, mp, tim, res, flag)        \
 	cv_timedwait_hires(cvp, mp, tim, res, flag)

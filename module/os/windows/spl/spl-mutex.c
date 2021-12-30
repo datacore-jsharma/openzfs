@@ -158,7 +158,8 @@ spl_mutex_exit(kmutex_t *mp)
 	VERIFY3U(KeGetCurrentIrql(), <=, DISPATCH_LEVEL);
 
 	// Wake up one waiter now that it is available.
-	KeSetEvent((PRKEVENT)&mp->m_lock, SEMAPHORE_INCREMENT, FALSE);
+	//KeSetEvent((PRKEVENT)&mp->m_lock, SEMAPHORE_INCREMENT, FALSE);
+	KeSetEvent((PRKEVENT)&mp->m_lock, IO_NO_INCREMENT, FALSE);
 	atomic_dec_32(&mp->m_set_event_guard);
 }
 

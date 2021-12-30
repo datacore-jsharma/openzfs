@@ -34,6 +34,7 @@
 #include <sys/condvar.h>
 #include <spl-debug.h>
 #include <sys/callb.h>
+#include <sys/spinlock.h>
 
 #ifdef SPL_DEBUG_MUTEX
 void spl_wdlist_settime(void *mpleak, uint64_t value);
@@ -94,6 +95,48 @@ spl_cv_broadcast(kcondvar_t *cvp)
 		KeSetEvent(&cvp->cv_kevent[CV_BROADCAST], 0, FALSE);
 }
 
+int
+spl_cv_wait_spin(kcondvar_t* cvp, kspinlock_t* sl, int flags, const char* msg)
+{
+    int result;
+    if (cvp->cv_initialised != CONDVAR_INIT)
+	panic("%s: not cv_initialised", __func__);
+
+    if (msg != NULL && msg[0] == '&')
+	++msg;  /* skip over '&' prefixes */
+#ifdef SPL_DEBUG_MUTEX
+    spl_wdlist_settime(mp->leak, 0);
+#endif
+
+    atomic_inc_32(&cvp->cv_waiters_count);
+   // mutex_exit(mp);
+    spinlock_exit(sl);
+    void* locks[CV_MAX_EVENTS] =
+    { &cvp->cv_kevent[CV_SIGNAL], &cvp->cv_kevent[CV_BROADCAST] };
+
+    result = KeWaitForMultipleObjects(2, locks, WaitAny, Executive,
+	KernelMode, FALSE, NULL, NULL);
+
+    // If last listener, clear BROADCAST event. (Even if it was SIGNAL
+    // overclearing will not hurt?)
+    //mutex_enter(mp);
+    spinlock_enter(sl);
+
+
+    if (cvp->cv_waiters_count == 1)
+	KeClearEvent(&cvp->cv_kevent[CV_BROADCAST]);
+
+    atomic_dec_32(&cvp->cv_waiters_count);
+
+#ifdef SPL_DEBUG_MUTEX
+    spl_wdlist_settime(mp->leak, gethrestime_sec());
+#endif
+    /*
+     * 1 - condvar got cv_signal()/cv_broadcast()
+     * 0 - received signal (kill -signal)
+     */
+    return (result == STATUS_ALERTED ? 0 : 1);
+}
 /*
  * Block on the indicated condition variable and
  * release the associated mutex while blocked.
@@ -137,6 +180,77 @@ spl_cv_wait(kcondvar_t *cvp, kmutex_t *mp, int flags, const char *msg)
 	 * 0 - received signal (kill -signal)
 	 */
 	return (result == STATUS_ALERTED ? 0 : 1);
+}
+
+int
+spl_cv_timedwait_spin(kcondvar_t* cvp, kspinlock_t* sl, clock_t tim, int flags,
+    const char* msg)
+{
+    int result;
+    clock_t timenow;
+    LARGE_INTEGER timeout;
+    (void)cvp;	(void)flags;
+
+    if (cvp->cv_initialised != CONDVAR_INIT)
+	panic("%s: not cv_initialised", __func__);
+
+    if (msg != NULL && msg[0] == '&')
+	++msg;  /* skip over '&' prefixes */
+
+    timenow = zfs_lbolt();
+
+    // Check for events already in the past
+    if (tim < timenow)
+	tim = timenow;
+
+    /*
+     * Pointer to a time-out value that specifies the absolute or
+     * relative time, in 100-nanosecond units, at which the wait is to
+     * be completed.  A positive value specifies an absolute time,
+     * relative to January 1, 1601. A negative value specifies an
+     * interval relative to the current time.
+     */
+    timeout.QuadPart = -100000 * MAX(1, (tim - timenow) / hz);
+
+#ifdef SPL_DEBUG_MUTEX
+    spl_wdlist_settime(mp->leak, 0);
+#endif
+
+    atomic_inc_32(&cvp->cv_waiters_count);
+    //mutex_exit(mp);
+    spinlock_exit(sl);
+    void* locks[CV_MAX_EVENTS] =
+    { &cvp->cv_kevent[CV_SIGNAL], &cvp->cv_kevent[CV_BROADCAST] };
+
+    result = KeWaitForMultipleObjects(2, locks, WaitAny, Executive,
+	KernelMode, FALSE, &timeout, NULL);
+
+    int last_waiter =
+	result == STATUS_WAIT_0 + CV_BROADCAST &&
+	cvp->cv_waiters_count == 1;
+
+    if (last_waiter)
+	KeClearEvent(&cvp->cv_kevent[CV_BROADCAST]);
+
+    atomic_dec_32(&cvp->cv_waiters_count);
+
+    //mutex_enter(mp);
+    spinlock_enter(sl);
+#ifdef SPL_DEBUG_MUTEX
+    spl_wdlist_settime(mp->leak, gethrestime_sec());
+#endif
+
+    switch (result) {
+
+    case STATUS_ALERTED: /* Signal */
+    case ERESTART:
+	return (0);
+
+    case STATUS_TIMEOUT: /* Timeout */
+	return (-1);
+    }
+
+    return (1);
 }
 
 /*
@@ -289,4 +403,75 @@ cv_timedwait_hires(kcondvar_t *cvp, kmutex_t *mp, hrtime_t tim,
 	}
 
 	return (1);
+}
+
+int
+cv_timedwait_hires_spin(kcondvar_t* cvp, kspinlock_t* sl, hrtime_t tim,
+    hrtime_t res, int flag)
+{
+    int result;
+    LARGE_INTEGER timeout;
+
+    if (cvp->cv_initialised != CONDVAR_INIT)
+	panic("%s: not cv_initialised", __func__);
+    ASSERT(cvp->cv_initialised == CONDVAR_INIT);
+
+    if (res > 1) {
+	/*
+	 * Align expiration to the specified resolution.
+	 */
+	if (flag & CALLOUT_FLAG_ROUNDUP)
+	    tim += res - 1;
+	tim = (tim / res) * res;
+    }
+
+    if (flag & CALLOUT_FLAG_ABSOLUTE) {
+	// 'tim' here is absolute UNIX time (from gethrtime()) so
+	// convert it to absolute Windows time
+	hrtime_t now = gethrtime();
+
+	tim -= now; // Remove the ticks, what remains is "sleep" amount.
+    }
+    timeout.QuadPart = -tim / 100;
+
+#ifdef SPL_DEBUG_MUTEX
+    spl_wdlist_settime(mp->leak, 0);
+#endif
+
+    atomic_inc_32(&cvp->cv_waiters_count);
+    //mutex_exit(mp);
+    spinlock_exit(sl);
+
+    void* locks[CV_MAX_EVENTS] =
+    { &cvp->cv_kevent[CV_SIGNAL], &cvp->cv_kevent[CV_BROADCAST] };
+
+    result = KeWaitForMultipleObjects(2, locks, WaitAny, Executive,
+	KernelMode, FALSE, &timeout, NULL);
+
+    int last_waiter =
+	result == STATUS_WAIT_0 + CV_BROADCAST &&
+	cvp->cv_waiters_count == 1;
+
+    if (last_waiter)
+	KeClearEvent(&cvp->cv_kevent[CV_BROADCAST]);
+
+    atomic_dec_32(&cvp->cv_waiters_count);
+
+    //mutex_enter(mp);
+    spinlock_enter(sl);
+#ifdef SPL_DEBUG_MUTEX
+    spl_wdlist_settime(mp->leak, gethrestime_sec());
+#endif
+
+    switch (result) {
+
+    case STATUS_ALERTED: /* Signal */
+    case ERESTART:
+	return (0);
+
+    case STATUS_TIMEOUT: /* Timeout */
+	return (-1);
+    }
+
+    return (1);
 }

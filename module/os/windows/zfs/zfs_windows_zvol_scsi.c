@@ -812,8 +812,8 @@ ScsiReadWriteSetup(
 	pWkRtnParms->pSrb = pSrb;
 	pWkRtnParms->Action = WkRtnAction;
 
-	IoInitializeWorkItem((PDEVICE_OBJECT)pHBAExt->pDrvObj,
-	    (PIO_WORKITEM)pWkRtnParms->pQueueWorkItem);
+	//IoInitializeWorkItem((PDEVICE_OBJECT)pHBAExt->pDrvObj,
+	  //  (PIO_WORKITEM)pWkRtnParms->pQueueWorkItem);
 
 	// Save the SRB in a list allowing cancellation via
 	// SRB_FUNCTION_RESET_xxx
@@ -827,8 +827,11 @@ ScsiReadWriteSetup(
 
 	// Queue work item, which will run in the System process.
 
-	IoQueueWorkItem((PIO_WORKITEM)pWkRtnParms->pQueueWorkItem,
-	    wzvol_GeneralWkRtn, DelayedWorkQueue, pWkRtnParms);
+	//IoQueueWorkItem((PIO_WORKITEM)pWkRtnParms->pQueueWorkItem,
+	  //  wzvol_GeneralWkRtn, DelayedWorkQueue, pWkRtnParms);
+	taskq_init_ent(&pWkRtnParms->ent);
+	taskq_dispatch_ent(zvol_taskq, wzvol_WkRtn,
+	    pWkRtnParms, 0, &pWkRtnParms->ent);
 
 	*pResult = ResultQueued;
 	return (SRB_STATUS_SUCCESS);
