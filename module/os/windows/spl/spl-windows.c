@@ -62,7 +62,7 @@ extern uint64_t	segkmem_total_mem_allocated;
 extern char hostname[MAXHOSTNAMELEN];
 
 uint32_t spl_hostid = 0;
-#define	    ZFS_MIN_MEMORY_LIMIT	2ULL * 1024ULL * 1024ULL * 1024ULL
+#define	    ZFS_MIN_MEMORY_LIMIT	1536ULL * 1024ULL * 1024ULL
 
 #if defined(__clang__)
 /*
@@ -490,7 +490,7 @@ spl_start(PUNICODE_STRING RegistryPath)
 	// Set 2GB as code above doesnt work
 	if (real_total_memory) {
 		zfs_total_memory_limit = spl_GetZfsTotalMemory(RegistryPath);
-		if (zfs_total_memory_limit > ZFS_MIN_MEMORY_LIMIT &&
+		if (zfs_total_memory_limit >= ZFS_MIN_MEMORY_LIMIT &&
 		    zfs_total_memory_limit < real_total_memory)
 			total_memory = zfs_total_memory_limit;
 		else
