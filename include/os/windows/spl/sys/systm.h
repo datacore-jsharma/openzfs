@@ -84,13 +84,15 @@ static inline void bsd_timeout(void *FUNC, void *ID, struct timespec *TIM)
 		btw->init = BSD_TIMEOUT_MAGIC;
 		KeInitializeTimer(&btw->timer);
 	}
-	if (!KeSetTimer(&btw->timer, duetime, NULL)) {
-		func((ID));
-	} else {
+	//if (!KeSetTimer(&btw->timer, duetime, NULL)) {
+	//	func((ID));
+	//} else {
+		KeSetTimer(&btw->timer, duetime, NULL);
+
 		/* Another option would have been to use taskq, it can cancel */
 		thread_create(NULL, 0, bsd_timeout_handler, ID, 0, NULL,
 		    TS_RUN, minclsyspri);
-	}
+	//}
 }
 
 #endif /* SPL_SYSTM_H */

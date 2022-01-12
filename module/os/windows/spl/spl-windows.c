@@ -524,7 +524,6 @@ spl_start(PUNICODE_STRING RegistryPath)
 	spl_vnode_init();
 	spl_kmem_thread_init();
 	spl_kmem_mp_init();
-
 	kstat_init();
 
 	IOLog("SPL: Loaded module v%s-%s%s, "

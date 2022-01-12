@@ -220,6 +220,7 @@
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/types.h>
+#include <sys/zthr.h>
 #include <stdbool.h>
 
 #include <Trace.h>
@@ -344,8 +345,8 @@ static struct timespec vmem_update_interval	= {15, 0};
 uint32_t vmem_mtbf;	/* mean time between failures [default: off] */
 size_t vmem_seg_size = sizeof (vmem_seg_t);
 
-static struct bsd_timeout_wrapper vmem_update_timer;
-
+//static struct bsd_timeout_wrapper vmem_update_timer;
+static zthr_t* vmem_update_zthr;
 
 // must match with include/sys/vmem_impl.h
 static vmem_kstat_t vmem_kstat_template = {
@@ -2310,12 +2311,17 @@ vmem_hash_rescale(vmem_t *vmp)
  */
 
 void
-vmem_update(void *dummy)
+vmem_update(void* arg, zthr_t* zthr)
 {
 	vmem_t *vmp;
+	UNREFERENCED_PARAMETER(arg);
 
 	mutex_enter(&vmem_list_lock);
 	for (vmp = vmem_list; vmp != NULL; vmp = vmp->vm_next) {
+
+		if (zthr_iscancelled(zthr)) {
+		    break;
+		}
 		/*
 		 * If threads are waiting for resources, wake them up
 		 * periodically so they can issue another kmem_reap()
@@ -2330,7 +2336,7 @@ vmem_update(void *dummy)
 	}
 	mutex_exit(&vmem_list_lock);
 
-	(void) bsd_timeout(vmem_update, dummy, &vmem_update_interval);
+	//(void) bsd_timeout(vmem_update, dummy, &vmem_update_interval);
 }
 
 void
@@ -3499,10 +3505,20 @@ vmem_init(const char *heap_name,
 	}
 
 	dprintf("SPL: starting vmem_update() thread\n");
-	vmem_update(&vmem_update_timer);
+	//vmem_update(&vmem_update_timer);
+	vmem_update_zthr = zthr_create_timer("vmem_update",
+	    NULL, vmem_update, NULL, SEC2NSEC(vmem_update_interval.tv_sec));
 
 	return (heap);
 }
+/* newly added..
+void
+spl_vmem_mp_init(void)
+{
+    vmem_update_zthr = zthr_create_timer("vmem_update",
+	NULL, vmem_update, NULL, SEC2NSEC(vmem_update_interval.tv_sec));
+}
+*/
 
 struct free_slab {
 	vmem_t *vmp;
@@ -3569,7 +3585,9 @@ vmem_fini(vmem_t *heap)
 	struct free_slab *fs;
 	uint64_t total;
 
-	bsd_untimeout(vmem_update, &vmem_update_timer);
+	//bsd_untimeout(vmem_update, &vmem_update_timer);
+	zthr_cancel(vmem_update_zthr);
+	zthr_destroy(vmem_update_zthr);
 
 	dprintf("SPL: %s: stopped vmem_update.  Creating list and walking "
 	    "arenas.\n", __func__);

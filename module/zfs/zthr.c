@@ -193,6 +193,11 @@
 
 #include <sys/zfs_context.h>
 #include <sys/zthr.h>
+//#include <sys/kmem.h>
+//#include <sys/types.h>
+#if defined(_KERNEL) && defined(_WIN32)
+#include <ntddk.h>
+#endif
 
 struct zthr {
 	/* running thread doing the work */
@@ -267,6 +272,48 @@ zthr_procedure(void *arg)
 	thread_exit();
 }
 
+static void
+zthr_timer_procedure(void* arg)
+{
+    zthr_t* t = arg;
+
+    mutex_enter(&t->zthr_state_lock);
+    ASSERT3P(t->zthr_thread, == , curthread);
+
+    while (!t->zthr_cancel) {
+	//if (t->zthr_checkfunc(t->zthr_arg, t)) {
+	    mutex_exit(&t->zthr_state_lock);
+	    t->zthr_func(t->zthr_arg, t);
+	    mutex_enter(&t->zthr_state_lock);
+	//}
+	//else {
+	    if (t->zthr_sleep_timeout == 0) {
+		cv_wait_idle(&t->zthr_cv, &t->zthr_state_lock);
+	    }
+	    else {
+		(void)cv_timedwait_idle_hires(&t->zthr_cv,
+		    &t->zthr_state_lock, t->zthr_sleep_timeout,
+		    MSEC2NSEC(1), 0);
+	    }
+	//}
+	if (t->zthr_haswaiters) {
+	    t->zthr_haswaiters = B_FALSE;
+	    cv_broadcast(&t->zthr_wait_cv);
+	}
+    }
+
+    /*
+     * Clear out the kernel thread metadata and notify the
+     * zthr_cancel() thread that we've stopped running.
+     */
+    t->zthr_thread = NULL;
+    t->zthr_cancel = B_FALSE;
+    cv_broadcast(&t->zthr_cv);
+
+    mutex_exit(&t->zthr_state_lock);
+    thread_exit();
+}
+
 zthr_t *
 zthr_create(const char *zthr_name, zthr_checkfunc_t *checkfunc,
     zthr_func_t *func, void *arg)
@@ -284,7 +331,12 @@ zthr_t *
 zthr_create_timer(const char *zthr_name, zthr_checkfunc_t *checkfunc,
     zthr_func_t *func, void *arg, hrtime_t max_sleep)
 {
-	zthr_t *t = kmem_zalloc(sizeof (*t), KM_SLEEP);
+#if defined(_KERNEL) && defined(_WIN32)
+    zthr_t* t = (zthr_t*)ExAllocatePoolWithTag(
+	NonPagedPoolNx, sizeof(zthr_t), '!SFZ');
+#else
+    zthr_t *t = kmem_zalloc(sizeof (*t), KM_SLEEP);
+#endif
 	mutex_init(&t->zthr_state_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&t->zthr_request_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&t->zthr_cv, NULL, CV_DEFAULT, NULL);
@@ -297,8 +349,16 @@ zthr_create_timer(const char *zthr_name, zthr_checkfunc_t *checkfunc,
 	t->zthr_sleep_timeout = max_sleep;
 	t->zthr_name = zthr_name;
 
-	t->zthr_thread = thread_create_named(zthr_name, NULL, 0,
-	    zthr_procedure, t, 0, &p0, TS_RUN, minclsyspri);
+	if (checkfunc != NULL)
+	{
+	    t->zthr_thread = thread_create_named(zthr_name, NULL, 0,
+		zthr_procedure, t, 0, &p0, TS_RUN, minclsyspri);
+	}
+	else
+	{
+	    t->zthr_thread = thread_create_named(zthr_name, NULL, 0,
+		zthr_timer_procedure, t, 0, &p0, TS_RUN, minclsyspri);
+	}
 
 	mutex_exit(&t->zthr_state_lock);
 
@@ -315,7 +375,12 @@ zthr_destroy(zthr_t *t)
 	mutex_destroy(&t->zthr_state_lock);
 	cv_destroy(&t->zthr_cv);
 	cv_destroy(&t->zthr_wait_cv);
-	kmem_free(t, sizeof (*t));
+
+#if defined(_KERNEL) && defined(_WIN32)
+	ExFreePoolWithTag(t, '!SFZ');
+#else
+	kmem_free(t, sizeof (*t));	
+#endif
 }
 
 /*
@@ -405,7 +470,7 @@ zthr_resume(zthr_t *t)
 	mutex_enter(&t->zthr_request_lock);
 	mutex_enter(&t->zthr_state_lock);
 
-	ASSERT3P(&t->zthr_checkfunc, !=, NULL);
+	//ASSERT3P(&t->zthr_checkfunc, !=, NULL);
 	ASSERT3P(&t->zthr_func, !=, NULL);
 	ASSERT(!t->zthr_cancel);
 	ASSERT(!t->zthr_haswaiters);

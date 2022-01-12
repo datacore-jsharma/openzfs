@@ -122,7 +122,9 @@ extern "C" {
 #define	VMEM_REENTRANT	0x80000000
 
 struct vmem;
+struct zthr;
 
+typedef struct zthr zthr_t;
 typedef struct vmem vmem_t;
 typedef void *(vmem_alloc_t)(vmem_t *, size_t, int);
 typedef void (vmem_free_t)(vmem_t *, void *, size_t);
@@ -137,7 +139,8 @@ typedef void *(vmem_ximport_t)(vmem_t *, size_t *, size_t, int);
 extern vmem_t *vmem_init(const char *, void *, size_t, size_t,
     vmem_alloc_t *, vmem_free_t *);
 extern void    vmem_fini(vmem_t *);
-extern void vmem_update(void *);
+//extern void vmem_update(void *);
+extern void vmem_update(void* arg, zthr_t* zthr);
 extern int vmem_is_populator();
 extern size_t vmem_seg_size;
 #endif

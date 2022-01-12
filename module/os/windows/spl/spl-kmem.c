@@ -44,6 +44,7 @@
 #include <sys/vmem_impl.h>
 // #include <kern/sched_prim.h>
 #include <sys/callb.h>
+#include <sys/zthr.h>
 #include <stdbool.h>
 
 #include <Trace.h>
@@ -295,7 +296,8 @@ static kmem_magtype_t kmem_magtype[] = {
 	{ 143,	64,	0,	0	},
 };
 
-static struct bsd_timeout_wrapper kmem_update_timer;
+//static struct bsd_timeout_wrapper kmem_update_timer;
+static zthr_t* kmem_update_zthr;
 static struct bsd_timeout_wrapper kmem_reaping;
 static struct bsd_timeout_wrapper kmem_reaping_idspace;
 
@@ -3096,28 +3098,38 @@ kmem_cache_update(kmem_cache_t *cp)
 
 }
 
-static void kmem_update(void *);
-
+//static void kmem_update(void *);
+static void kmem_update(void* arg, zthr_t* zthr);
+/*
 static void
 kmem_update_timeout(void *dummy)
 {
 	(void) bsd_timeout(kmem_update, dummy, &kmem_reap_interval);
 }
+*/
 
 static void
-kmem_update(void *dummy)
+kmem_update(void* arg, zthr_t* zthr)
 {
-	kmem_cache_applyall(kmem_cache_update, NULL, TQ_NOSLEEP);
+    UNREFERENCED_PARAMETER(arg);
+    kmem_cache_applyall(kmem_cache_update, NULL, TQ_NOSLEEP);
+}
+
+//static void
+//kmem_update(void *dummy)
+//{
+//	kmem_cache_applyall(kmem_cache_update, NULL, TQ_NOSLEEP);
 
 	/*
 	 * We use taskq_dispatch() to reschedule the timeout so that
 	 * kmem_update() becomes self-throttling: it won't schedule
 	 * new tasks until all previous tasks have completed.
 	 */
-	if (!taskq_dispatch(kmem_taskq, kmem_update_timeout, dummy, TQ_NOSLEEP))
-		kmem_update_timeout(NULL);
+	//if (!taskq_dispatch(kmem_taskq, kmem_update_timeout, dummy, TQ_NOSLEEP))
+	//	kmem_update_timeout(NULL);
 
-}
+//}
+
 
 static int
 kmem_cache_kstat_update(kstat_t *ksp, int rw)
@@ -5368,7 +5380,10 @@ spl_kmem_thread_fini(void)
 	cv_destroy(&spl_free_thread_cv);
 	mutex_destroy(&spl_free_thread_lock);
 
-	bsd_untimeout(kmem_update, &kmem_update_timer);
+	//bsd_untimeout(kmem_update, &kmem_update_timer);
+	zthr_cancel(kmem_update_zthr);
+	zthr_destroy(kmem_update_zthr);
+
 	bsd_untimeout(kmem_reap_timeout, &kmem_reaping);
 	bsd_untimeout(kmem_reap_timeout, &kmem_reaping_idspace);
 
@@ -5384,7 +5399,9 @@ spl_kmem_thread_fini(void)
 void
 spl_kmem_mp_init(void)
 {
-	kmem_update_timeout(&kmem_update_timer);
+    //kmem_update_timeout(&kmem_update_timer);
+    kmem_update_zthr = zthr_create_timer("kmem_update",
+	NULL, kmem_update, NULL, SEC2NSEC(kmem_reap_interval.tv_sec));
 }
 
 /*
