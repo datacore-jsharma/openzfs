@@ -68,7 +68,7 @@
 #include <sys/condvar.h>
 #include <sys/zfs_ioctl.h>
 
-int zfs_zevent_len_max = 512;
+static int zfs_zevent_len_max = 512;
 
 static int zevent_len_cur = 0;
 static int zevent_waiters = 0;
@@ -278,25 +278,29 @@ zfs_zevent_minor_to_state(minor_t minor, zfs_zevent_t **ze)
 	return (0);
 }
 
-int
+zfs_file_t *
 zfs_zevent_fd_hold(int fd, minor_t *minorp, zfs_zevent_t **ze)
 {
-	int error;
+	zfs_file_t *fp = zfs_file_get(fd);
+	if (fp == NULL)
+		return (NULL);
 
-	error = zfsdev_getminor(fd, minorp);
+	int error = zfsdev_getminor(fp, minorp);
 	if (error == 0)
 		error = zfs_zevent_minor_to_state(*minorp, ze);
 
-	if (error)
-		zfs_zevent_fd_rele(fd);
+	if (error) {
+		zfs_zevent_fd_rele(fp);
+		fp = NULL;
+	}
 
-	return (error);
+	return (fp);
 }
 
 void
-zfs_zevent_fd_rele(int fd)
+zfs_zevent_fd_rele(zfs_file_t *fp)
 {
-	zfs_file_put(fd);
+	zfs_file_put(fp);
 }
 
 /*
@@ -479,21 +483,21 @@ zfs_zevent_destroy(zfs_zevent_t *ze)
 /*
  * Wrappers for FM nvlist allocators
  */
-/* ARGSUSED */
 static void *
 i_fm_alloc(nv_alloc_t *nva, size_t size)
 {
+	(void) nva;
 	return (kmem_zalloc(size, KM_SLEEP));
 }
 
-/* ARGSUSED */
 static void
 i_fm_free(nv_alloc_t *nva, void *buf, size_t size)
 {
+	(void) nva;
 	kmem_free(buf, size);
 }
 
-const nv_alloc_ops_t fm_mem_alloc_ops = {
+static const nv_alloc_ops_t fm_mem_alloc_ops = {
 	.nv_ao_init = NULL,
 	.nv_ao_fini = NULL,
 	.nv_ao_alloc = i_fm_alloc,
@@ -698,7 +702,7 @@ i_fm_payload_set(nvlist_t *payload, const char *name, va_list ap)
 		case DATA_TYPE_STRING_ARRAY:
 			nelem = va_arg(ap, int);
 			ret = nvlist_add_string_array(payload, name,
-			    va_arg(ap, char **), nelem);
+			    va_arg(ap, const char **), nelem);
 			break;
 		case DATA_TYPE_NVLIST:
 			ret = nvlist_add_nvlist(payload, name,
@@ -707,7 +711,7 @@ i_fm_payload_set(nvlist_t *payload, const char *name, va_list ap)
 		case DATA_TYPE_NVLIST_ARRAY:
 			nelem = va_arg(ap, int);
 			ret = nvlist_add_nvlist_array(payload, name,
-			    va_arg(ap, nvlist_t **), nelem);
+			    va_arg(ap, const nvlist_t **), nelem);
 			break;
 		default:
 			ret = EINVAL;
@@ -863,8 +867,10 @@ fm_fmri_hc_set(nvlist_t *fmri, int version, const nvlist_t *auth,
 	}
 	va_end(ap);
 
-	if (nvlist_add_nvlist_array(fmri, FM_FMRI_HC_LIST, pairs, npairs) != 0)
+	if (nvlist_add_nvlist_array(fmri, FM_FMRI_HC_LIST,
+	    (const nvlist_t **)pairs, npairs) != 0) {
 		atomic_inc_64(&erpt_kstat_data.fmri_set_failed.value.ui64);
+	}
 
 	for (i = 0; i < npairs; i++)
 		fm_nvlist_destroy(pairs[i], FM_NVA_RETAIN);
@@ -957,8 +963,8 @@ fm_fmri_hc_create(nvlist_t *fmri, int version, const nvlist_t *auth,
 	/*
 	 * Create the fmri hc list
 	 */
-	if (nvlist_add_nvlist_array(fmri, FM_FMRI_HC_LIST, pairs,
-	    npairs + n) != 0) {
+	if (nvlist_add_nvlist_array(fmri, FM_FMRI_HC_LIST,
+	    (const nvlist_t **)pairs, npairs + n) != 0) {
 		atomic_inc_64(&erpt_kstat_data.fmri_set_failed.value.ui64);
 		return;
 	}
@@ -1124,7 +1130,7 @@ fm_fmri_mem_set(nvlist_t *fmri, int version, const nvlist_t *auth,
 
 	if (serial != NULL) {
 		if (nvlist_add_string_array(fmri, FM_FMRI_MEM_SERIAL_ID,
-		    (char **)&serial, 1) != 0) {
+		    (const char **)&serial, 1) != 0) {
 			atomic_inc_64(
 			    &erpt_kstat_data.fmri_set_failed.value.ui64);
 		}

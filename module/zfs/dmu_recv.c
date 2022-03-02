@@ -64,12 +64,12 @@
 #endif
 #include <sys/zfs_file.h>
 
-int zfs_recv_queue_length = SPA_MAXBLOCKSIZE;
-int zfs_recv_queue_ff = 20;
-int zfs_recv_write_batch_size = 1024 * 1024;
+static int zfs_recv_queue_length = SPA_MAXBLOCKSIZE;
+static int zfs_recv_queue_ff = 20;
+static int zfs_recv_write_batch_size = 1024 * 1024;
 
-static char *dmu_recv_tag = "dmu_recv_tag";
-const char *recv_clone_name = "%recv";
+static void *const dmu_recv_tag = "dmu_recv_tag";
+const char *const recv_clone_name = "%recv";
 
 static int receive_read_payload_and_next_header(dmu_recv_cookie_t *ra, int len,
     void *buf);
@@ -597,7 +597,15 @@ dmu_recv_begin_check(void *arg, dmu_tx_t *tx)
 		if (!(flags & DRR_FLAG_SPILL_BLOCK))
 			return (SET_ERROR(ZFS_ERR_SPILL_BLOCK_FLAG_MISSING));
 	} else {
-		dsflags |= DS_HOLD_FLAG_DECRYPT;
+		/*
+		 * We support unencrypted datasets below encrypted ones now,
+		 * so add the DS_HOLD_FLAG_DECRYPT flag only if we are dealing
+		 * with a dataset we may encrypt.
+		 */
+		if (drba->drba_dcp != NULL &&
+		    drba->drba_dcp->cp_crypt != ZIO_CRYPT_OFF) {
+			dsflags |= DS_HOLD_FLAG_DECRYPT;
+		}
 	}
 
 	error = dsl_dataset_hold_flags(dp, tofs, dsflags, FTAG, &ds);
@@ -3389,7 +3397,6 @@ dmu_objset_is_receiving(objset_t *os)
 	    os->os_dsl_dataset->ds_owner == dmu_recv_tag);
 }
 
-/* BEGIN CSTYLED */
 ZFS_MODULE_PARAM(zfs_recv, zfs_recv_, queue_length, INT, ZMOD_RW,
 	"Maximum receive queue length");
 
@@ -3398,4 +3405,3 @@ ZFS_MODULE_PARAM(zfs_recv, zfs_recv_, queue_ff, INT, ZMOD_RW,
 
 ZFS_MODULE_PARAM(zfs_recv, zfs_recv_, write_batch_size, INT, ZMOD_RW,
 	"Maximum amount of writes to batch into one transaction");
-/* END CSTYLED */

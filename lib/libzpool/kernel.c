@@ -78,7 +78,6 @@ struct proc p0;
 #define	TS_STACK_MIN	MAX(PTHREAD_STACK_MIN, 32768)
 #define	TS_STACK_MAX	(256 * 1024)
 
-/*ARGSUSED*/
 kthread_t *
 zk_thread_create(void (*func)(void *), void *arg, size_t stksize, int state)
 {
@@ -134,30 +133,35 @@ zk_thread_create(void (*func)(void *), void *arg, size_t stksize, int state)
  * kstats
  * =========================================================================
  */
-/*ARGSUSED*/
 kstat_t *
 kstat_create(const char *module, int instance, const char *name,
     const char *class, uchar_t type, ulong_t ndata, uchar_t ks_flag)
 {
+	(void) module, (void) instance, (void) name, (void) class, (void) type,
+	    (void) ndata, (void) ks_flag;
 	return (NULL);
 }
 
-/*ARGSUSED*/
 void
 kstat_install(kstat_t *ksp)
-{}
+{
+	(void) ksp;
+}
 
-/*ARGSUSED*/
 void
 kstat_delete(kstat_t *ksp)
-{}
+{
+	(void) ksp;
+}
 
 void
 kstat_set_raw_ops(kstat_t *ksp,
     int (*headers)(char *buf, size_t size),
     int (*data)(char *buf, size_t size, void *data),
     void *(*addr)(kstat_t *ksp, loff_t index))
-{}
+{
+	(void) ksp, (void) headers, (void) data, (void) addr;
+}
 
 /*
  * =========================================================================
@@ -168,6 +172,7 @@ kstat_set_raw_ops(kstat_t *ksp,
 void
 mutex_init(kmutex_t *mp, char *name, int type, void *cookie)
 {
+	(void) name, (void) type, (void) cookie;
 	VERIFY0(pthread_mutex_init(&mp->m_lock, NULL));
 	memset(&mp->m_owner, 0, sizeof (pthread_t));
 }
@@ -188,9 +193,7 @@ mutex_enter(kmutex_t *mp)
 int
 mutex_tryenter(kmutex_t *mp)
 {
-	int error;
-
-	error = pthread_mutex_trylock(&mp->m_lock);
+	int error = pthread_mutex_trylock(&mp->m_lock);
 	if (error == 0) {
 		mp->m_owner = pthread_self();
 		return (1);
@@ -216,6 +219,7 @@ mutex_exit(kmutex_t *mp)
 void
 rw_init(krwlock_t *rwlp, char *name, int type, void *arg)
 {
+	(void) name, (void) type, (void) arg;
 	VERIFY0(pthread_rwlock_init(&rwlp->rw_lock, NULL));
 	rwlp->rw_readers = 0;
 	rwlp->rw_owner = 0;
@@ -274,19 +278,20 @@ rw_tryenter(krwlock_t *rwlp, krw_t rw)
 	return (0);
 }
 
-/* ARGSUSED */
 uint32_t
 zone_get_hostid(void *zonep)
 {
 	/*
 	 * We're emulating the system's hostid in userland.
 	 */
+	(void) zonep;
 	return (strtoul(hw_serial, NULL, 10));
 }
 
 int
 rw_tryupgrade(krwlock_t *rwlp)
 {
+	(void) rwlp;
 	return (0);
 }
 
@@ -299,6 +304,7 @@ rw_tryupgrade(krwlock_t *rwlp)
 void
 cv_init(kcondvar_t *cv, char *name, int type, void *arg)
 {
+	(void) name, (void) type, (void) arg;
 	VERIFY0(pthread_cond_init(cv, NULL));
 }
 
@@ -356,11 +362,11 @@ cv_timedwait(kcondvar_t *cv, kmutex_t *mp, clock_t abstime)
 	return (1);
 }
 
-/*ARGSUSED*/
 int
 cv_timedwait_hires(kcondvar_t *cv, kmutex_t *mp, hrtime_t tim, hrtime_t res,
     int flag)
 {
+	(void) res;
 	int error;
 	struct timeval tv;
 	struct timespec ts;
@@ -416,7 +422,9 @@ cv_broadcast(kcondvar_t *cv)
 
 void
 seq_printf(struct seq_file *m, const char *fmt, ...)
-{}
+{
+	(void) m, (void) fmt;
+}
 
 void
 procfs_list_install(const char *module,
@@ -429,6 +437,8 @@ procfs_list_install(const char *module,
     int (*clear)(procfs_list_t *procfs_list),
     size_t procfs_list_node_off)
 {
+	(void) module, (void) submodule, (void) name, (void) mode, (void) show,
+	    (void) show_header, (void) clear;
 	mutex_init(&procfs_list->pl_lock, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&procfs_list->pl_list,
 	    procfs_list_node_off + sizeof (procfs_list_node_t),
@@ -439,7 +449,9 @@ procfs_list_install(const char *module,
 
 void
 procfs_list_uninstall(procfs_list_t *procfs_list)
-{}
+{
+	(void) procfs_list;
+}
 
 void
 procfs_list_destroy(procfs_list_t *procfs_list)
@@ -639,7 +651,6 @@ vcmn_err(int ce, const char *fmt, va_list adx)
 	}
 }
 
-/*PRINTFLIKE2*/
 void
 cmn_err(int ce, const char *fmt, ...)
 {
@@ -783,6 +794,7 @@ random_get_pseudo_bytes(uint8_t *ptr, size_t len)
 int
 ddi_strtoul(const char *hw_serial, char **nptr, int base, unsigned long *result)
 {
+	(void) nptr;
 	char *end;
 
 	*result = strtoul(hw_serial, &end, base);
@@ -796,6 +808,7 @@ ddi_strtoul(const char *hw_serial, char **nptr, int base, unsigned long *result)
 int
 ddi_strtoull(const char *str, char **nptr, int base, u_longlong_t *result)
 {
+	(void) nptr;
 	char *end;
 
 	*result = strtoull(str, &end, base);
@@ -875,60 +888,70 @@ kernel_fini(void)
 uid_t
 crgetuid(cred_t *cr)
 {
+	(void) cr;
 	return (0);
 }
 
 uid_t
 crgetruid(cred_t *cr)
 {
+	(void) cr;
 	return (0);
 }
 
 gid_t
 crgetgid(cred_t *cr)
 {
+	(void) cr;
 	return (0);
 }
 
 int
 crgetngroups(cred_t *cr)
 {
+	(void) cr;
 	return (0);
 }
 
 gid_t *
 crgetgroups(cred_t *cr)
 {
+	(void) cr;
 	return (NULL);
 }
 
 int
 zfs_secpolicy_snapshot_perms(const char *name, cred_t *cr)
 {
+	(void) name, (void) cr;
 	return (0);
 }
 
 int
 zfs_secpolicy_rename_perms(const char *from, const char *to, cred_t *cr)
 {
+	(void) from, (void) to, (void) cr;
 	return (0);
 }
 
 int
 zfs_secpolicy_destroy_perms(const char *name, cred_t *cr)
 {
+	(void) name, (void) cr;
 	return (0);
 }
 
 int
 secpolicy_zfs(const cred_t *cr)
 {
+	(void) cr;
 	return (0);
 }
 
 int
 secpolicy_zfs_proc(const cred_t *cr, proc_t *proc)
 {
+	(void) cr, (void) proc;
 	return (0);
 }
 
@@ -975,25 +998,25 @@ kmem_asprintf(const char *fmt, ...)
 	return (buf);
 }
 
-/* ARGSUSED */
-int
+zfs_file_t *
 zfs_onexit_fd_hold(int fd, minor_t *minorp)
 {
+	(void) fd;
 	*minorp = 0;
-	return (0);
+	return (NULL);
 }
 
-/* ARGSUSED */
 void
-zfs_onexit_fd_rele(int fd)
+zfs_onexit_fd_rele(zfs_file_t *fp)
 {
+	(void) fp;
 }
 
-/* ARGSUSED */
 int
 zfs_onexit_add_cb(minor_t minor, void (*func)(void *), void *data,
     uint64_t *action_handle)
 {
+	(void) minor, (void) func, (void) data, (void) action_handle;
 	return (0);
 }
 
@@ -1006,6 +1029,7 @@ spl_fstrans_mark(void)
 void
 spl_fstrans_unmark(fstrans_cookie_t cookie)
 {
+	(void) cookie;
 }
 
 int
@@ -1025,22 +1049,26 @@ void *zvol_tag = "zvol_tag";
 void
 zvol_create_minor(const char *name)
 {
+	(void) name;
 }
 
 void
 zvol_create_minors_recursive(const char *name)
 {
+	(void) name;
 }
 
 void
 zvol_remove_minors(spa_t *spa, const char *name, boolean_t async)
 {
+	(void) spa, (void) name, (void) async;
 }
 
 void
 zvol_rename_minors(spa_t *spa, const char *oldname, const char *newname,
     boolean_t async)
 {
+	(void) spa, (void) oldname, (void) newname, (void) async;
 }
 
 /*
@@ -1334,10 +1362,9 @@ zfs_file_getattr(zfs_file_t *fp, zfs_file_attr_t *zfattr)
 int
 zfs_file_fsync(zfs_file_t *fp, int flags)
 {
-	int rc;
+	(void) flags;
 
-	rc = fsync(fp->f_fd);
-	if (rc < 0)
+	if (fsync(fp->f_fd) < 0)
 		return (errno);
 
 	return (0);
@@ -1359,6 +1386,7 @@ zfs_file_fallocate(zfs_file_t *fp, int mode, loff_t offset, loff_t len)
 #ifdef __linux__
 	return (fallocate(fp->f_fd, mode, offset, len));
 #else
+	(void) fp, (void) mode, (void) offset, (void) len;
 	return (EOPNOTSUPP);
 #endif
 }
@@ -1395,33 +1423,33 @@ zfs_file_unlink(const char *path)
  * Get reference to file pointer
  *
  * fd - input file descriptor
- * fpp - pointer to file pointer
  *
- * Returns 0 on success EBADF on failure.
+ * Returns pointer to file struct or NULL.
  * Unsupported in user space.
  */
-int
-zfs_file_get(int fd, zfs_file_t **fpp)
+zfs_file_t *
+zfs_file_get(int fd)
 {
+	(void) fd;
 	abort();
-
-	return (EOPNOTSUPP);
+	return (NULL);
 }
-
 /*
  * Drop reference to file pointer
  *
- * fd - input file descriptor
+ * fp - pointer to file struct
  *
  * Unsupported in user space.
  */
 void
-zfs_file_put(int fd)
+zfs_file_put(zfs_file_t *fp)
 {
 	abort();
+	(void) fp;
 }
 
 void
 zfsvfs_update_fromname(const char *oldname, const char *newname)
 {
+	(void) oldname, (void) newname;
 }

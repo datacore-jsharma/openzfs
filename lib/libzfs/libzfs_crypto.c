@@ -210,7 +210,7 @@ get_format_prompt_string(zfs_keyformat_t format)
 /* do basic validation of the key material */
 static int
 validate_key(libzfs_handle_t *hdl, zfs_keyformat_t keyformat,
-    const char *key, size_t keylen)
+    const char *key, size_t keylen, boolean_t do_verify)
 {
 	switch (keyformat) {
 	case ZFS_KEYFORMAT_RAW:
@@ -255,7 +255,12 @@ validate_key(libzfs_handle_t *hdl, zfs_keyformat_t keyformat,
 		}
 		break;
 	case ZFS_KEYFORMAT_PASSPHRASE:
-		/* verify the length is within bounds */
+		/*
+		 * Verify the length is within bounds when setting a new key,
+		 * but not when loading an existing key.
+		 */
+		if (!do_verify)
+			break;
 		if (keylen > MAX_PASSPHRASE_LEN) {
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "Passphrase too long (max %u)."),
@@ -390,7 +395,8 @@ get_key_interactive(libzfs_handle_t *restrict hdl, const char *fsname,
 	if (!confirm_key)
 		goto out;
 
-	if ((ret = validate_key(hdl, keyformat, buf, buflen)) != 0) {
+	if ((ret = validate_key(hdl, keyformat, buf, buflen, confirm_key)) !=
+	    0) {
 		free(buf);
 		return (ret);
 	}
@@ -486,6 +492,7 @@ get_key_material_file(libzfs_handle_t *hdl, const char *uri,
     const char *fsname, zfs_keyformat_t keyformat, boolean_t newkey,
     uint8_t **restrict buf, size_t *restrict len_out)
 {
+	(void) fsname, (void) newkey;
 	FILE *f = NULL;
 	int ret = 0;
 
@@ -496,7 +503,7 @@ get_key_material_file(libzfs_handle_t *hdl, const char *uri,
 		ret = errno;
 		errno = 0;
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-		    "Failed to open key material file"));
+		    "Failed to open key material file: %s"), strerror(ret));
 		return (ret);
 	}
 
@@ -512,6 +519,7 @@ get_key_material_https(libzfs_handle_t *hdl, const char *uri,
     const char *fsname, zfs_keyformat_t keyformat, boolean_t newkey,
     uint8_t **restrict buf, size_t *restrict len_out)
 {
+	(void) fsname, (void) newkey;
 	int ret = 0;
 	FILE *key = NULL;
 	boolean_t is_http = strncmp(uri, "http:", strlen("http:")) == 0;
@@ -687,7 +695,7 @@ end:
  */
 static int
 get_key_material(libzfs_handle_t *hdl, boolean_t do_verify, boolean_t newkey,
-    zfs_keyformat_t keyformat, char *keylocation, const char *fsname,
+    zfs_keyformat_t keyformat, const char *keylocation, const char *fsname,
     uint8_t **km_out, size_t *kmlen_out, boolean_t *can_retry_out)
 {
 	int ret;
@@ -750,7 +758,8 @@ get_key_material(libzfs_handle_t *hdl, boolean_t do_verify, boolean_t newkey,
 		goto error;
 	}
 
-	if ((ret = validate_key(hdl, keyformat, (const char *)km, kmlen)) != 0)
+	if ((ret = validate_key(hdl, keyformat, (const char *)km, kmlen,
+	    do_verify)) != 0)
 		goto error;
 
 	*km_out = km;
@@ -776,7 +785,7 @@ error:
 
 static int
 derive_key(libzfs_handle_t *hdl, zfs_keyformat_t format, uint64_t iters,
-    uint8_t *key_material, size_t key_material_len, uint64_t salt,
+    uint8_t *key_material, uint64_t salt,
     uint8_t **key_out)
 {
 	int ret;
@@ -919,8 +928,7 @@ populate_create_encryption_params_nvlists(libzfs_handle_t *hdl,
 	}
 
 	/* derive a key from the key material */
-	ret = derive_key(hdl, keyformat, iters, key_material, key_material_len,
-	    salt, &key_data);
+	ret = derive_key(hdl, keyformat, iters, key_material, salt, &key_data);
 	if (ret != 0)
 		goto error;
 
@@ -1178,6 +1186,7 @@ int
 zfs_crypto_clone_check(libzfs_handle_t *hdl, zfs_handle_t *origin_zhp,
     char *parent_name, nvlist_t *props)
 {
+	(void) origin_zhp, (void) parent_name;
 	char errbuf[1024];
 
 	(void) snprintf(errbuf, sizeof (errbuf),
@@ -1241,7 +1250,7 @@ out:
  * filesystem and all of its children.
  */
 int
-zfs_crypto_attempt_load_keys(libzfs_handle_t *hdl, char *fsname)
+zfs_crypto_attempt_load_keys(libzfs_handle_t *hdl, const char *fsname)
 {
 	int ret;
 	zfs_handle_t *zhp = NULL;
@@ -1276,7 +1285,8 @@ error:
 }
 
 int
-zfs_crypto_load_key(zfs_handle_t *zhp, boolean_t noop, char *alt_keylocation)
+zfs_crypto_load_key(zfs_handle_t *zhp, boolean_t noop,
+    const char *alt_keylocation)
 {
 	int ret, attempts = 0;
 	char errbuf[1024];
@@ -1284,7 +1294,7 @@ zfs_crypto_load_key(zfs_handle_t *zhp, boolean_t noop, char *alt_keylocation)
 	uint64_t keyformat = ZFS_KEYFORMAT_NONE;
 	char prop_keylocation[MAXNAMELEN];
 	char prop_encroot[MAXNAMELEN];
-	char *keylocation = NULL;
+	const char *keylocation = NULL;
 	uint8_t *key_material = NULL, *key_data = NULL;
 	size_t key_material_len;
 	boolean_t is_encroot, can_retry = B_FALSE, correctible = B_FALSE;
@@ -1375,8 +1385,8 @@ try_again:
 		goto error;
 
 	/* derive a key from the key material */
-	ret = derive_key(zhp->zfs_hdl, keyformat, iters, key_material,
-	    key_material_len, salt, &key_data);
+	ret = derive_key(zhp->zfs_hdl, keyformat, iters, key_material, salt,
+	    &key_data);
 	if (ret != 0)
 		goto error;
 

@@ -33,7 +33,6 @@
 #include <sys/zfs_context.h>
 #include <sys/zfs_znode.h>
 
-
 typedef struct abd_stats {
 	kstat_named_t abdstat_struct_size;
 	kstat_named_t abdstat_scatter_cnt;
@@ -71,12 +70,12 @@ static abd_stats_t abd_stats = {
 };
 
 struct {
-        wmsum_t abdstat_struct_size;
-        wmsum_t abdstat_scatter_cnt;
-        wmsum_t abdstat_scatter_data_size;
-        wmsum_t abdstat_scatter_chunk_waste;
-        wmsum_t abdstat_linear_cnt;
-        wmsum_t abdstat_linear_data_size;
+	wmsum_t abdstat_struct_size;
+	wmsum_t abdstat_scatter_cnt;
+	wmsum_t abdstat_scatter_data_size;
+	wmsum_t abdstat_scatter_chunk_waste;
+	wmsum_t abdstat_linear_cnt;
+	wmsum_t abdstat_linear_data_size;
 } abd_sums;
 
 /*

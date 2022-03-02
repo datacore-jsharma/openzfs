@@ -409,6 +409,19 @@ check_device(const char *path, boolean_t force,
 void
 after_zpool_upgrade(zpool_handle_t *zhp)
 {
+	(void) zhp;
+}
+
+int
+check_file(const char *file, boolean_t force, boolean_t isspare)
+{
+	return (check_file_generic(file, force, isspare));
+}
+
+int
+check_file(const char *file, boolean_t force, boolean_t isspare)
+{
+	return (check_file_generic(file, force, isspare));
 }
 
 int

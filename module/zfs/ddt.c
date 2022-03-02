@@ -503,7 +503,7 @@ ddt_get_dedup_histogram(spa_t *spa, ddt_histogram_t *ddh)
 {
 	for (enum zio_checksum c = 0; c < ZIO_CHECKSUM_FUNCTIONS; c++) {
 		ddt_t *ddt = spa->spa_ddt[c];
-		for (enum ddt_type type = 0; type < DDT_TYPES; type++) {
+		for (enum ddt_type type = 0; type < DDT_TYPES && ddt; type++) {
 			for (enum ddt_class class = 0; class < DDT_CLASSES;
 			    class++) {
 				ddt_histogram_add(ddh,
@@ -570,7 +570,6 @@ ddt_compress(void *src, uchar_t *dst, size_t s_len, size_t d_len)
 	}
 
 	*version = cpfunc;
-	/* CONSTCOND */
 	if (ZFS_HOST_BYTEORDER)
 		*version |= DDT_COMPRESS_BYTEORDER_MASK;
 
@@ -1181,7 +1180,5 @@ ddt_walk(spa_t *spa, ddt_bookmark_t *ddb, ddt_entry_t *dde)
 	return (SET_ERROR(ENOENT));
 }
 
-/* BEGIN CSTYLED */
 ZFS_MODULE_PARAM(zfs_dedup, zfs_dedup_, prefetch, INT, ZMOD_RW,
 	"Enable prefetching dedup-ed blks");
-/* END CSTYLED */

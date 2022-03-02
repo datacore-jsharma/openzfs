@@ -56,9 +56,7 @@ function cleanup
 		rm -rf $corepath
 	fi
 	for ds in $fs1 $fs $ctr; do
-		if datasetexists $ds; then
-			log_must zfs destroy -rRf $ds
-		fi
+		datasetexists $ds && destroy_dataset $ds -rRf
 	done
 }
 
@@ -99,7 +97,6 @@ if is_linux; then
 	ulimit -c unlimited
 	echo "$corefile" >/proc/sys/kernel/core_pattern
 	echo 0 >/proc/sys/kernel/core_uses_pid
-	export ASAN_OPTIONS="abort_on_error=1:disable_coredump=0"
 elif is_freebsd; then
 	ulimit -c unlimited
 	savedcorefile=$(sysctl -n kern.corefile)

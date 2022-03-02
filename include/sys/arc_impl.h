@@ -153,24 +153,22 @@ typedef struct l1arc_buf_hdr {
 	kmutex_t		b_freeze_lock;
 	zio_cksum_t		*b_freeze_cksum;
 
-	arc_buf_t		*b_buf;
-	uint32_t		b_bufcnt;
-	/* for waiting on writes to complete */
+	/* for waiting on reads to complete */
 	kcondvar_t		b_cv;
 	uint8_t			b_byteswap;
-
 
 	/* protected by arc state mutex */
 	arc_state_t		*b_state;
 	multilist_node_t	b_arc_node;
 
-	/* updated atomically */
+	/* protected by hash lock */
 	clock_t			b_arc_access;
 	uint32_t		b_mru_hits;
 	uint32_t		b_mru_ghost_hits;
 	uint32_t		b_mfu_hits;
 	uint32_t		b_mfu_ghost_hits;
-	uint32_t		b_l2_hits;
+	uint32_t		b_bufcnt;
+	arc_buf_t		*b_buf;
 
 	/* self protecting */
 	zfs_refcount_t		b_refcnt;
@@ -252,7 +250,8 @@ typedef struct l2arc_dev_hdr_phys {
 	const uint64_t		dh_pad[30];	/* pad to 512 bytes */
 	zio_eck_t		dh_tail;
 } l2arc_dev_hdr_phys_t;
-CTASSERT_GLOBAL(sizeof (l2arc_dev_hdr_phys_t) == SPA_MINBLOCKSIZE);
+_Static_assert(sizeof (l2arc_dev_hdr_phys_t) == SPA_MINBLOCKSIZE,
+	"l2arc_dev_hdr_phys_t wrong size");
 
 /*
  * A single ARC buffer header entry in a l2arc_log_blk_phys_t.
@@ -309,10 +308,12 @@ typedef struct l2arc_log_blk_phys {
  * The size of l2arc_log_blk_phys_t has to be power-of-2 aligned with
  * SPA_MINBLOCKSHIFT because of L2BLK_SET_*SIZE macros.
  */
-CTASSERT_GLOBAL(IS_P2ALIGNED(sizeof (l2arc_log_blk_phys_t),
-    1ULL << SPA_MINBLOCKSHIFT));
-CTASSERT_GLOBAL(sizeof (l2arc_log_blk_phys_t) >= SPA_MINBLOCKSIZE);
-CTASSERT_GLOBAL(sizeof (l2arc_log_blk_phys_t) <= SPA_MAXBLOCKSIZE);
+_Static_assert(IS_P2ALIGNED(sizeof (l2arc_log_blk_phys_t),
+    1ULL << SPA_MINBLOCKSHIFT), "l2arc_log_blk_phys_t misaligned");
+_Static_assert(sizeof (l2arc_log_blk_phys_t) >= SPA_MINBLOCKSIZE,
+	"l2arc_log_blk_phys_t too small");
+_Static_assert(sizeof (l2arc_log_blk_phys_t) <= SPA_MAXBLOCKSIZE,
+	"l2arc_log_blk_phys_t too big");
 
 /*
  * These structures hold in-flight abd buffers for log blocks as they're being
@@ -360,7 +361,6 @@ typedef struct l2arc_lb_ptr_buf {
 		void *tmp = (x);\
 		x = y;		\
 		y = tmp;	\
-		_NOTE(CONSTCOND)\
 	} while (0)
 
 #define	L2ARC_DEV_HDR_MAGIC	0x5a46534341434845LLU	/* ASCII: "ZFSCACHE" */
@@ -964,6 +964,13 @@ typedef struct arc_evict_waiter {
 #define	arc_c_max	ARCSTAT(arcstat_c_max)	/* max target cache size */
 #define	arc_sys_free	ARCSTAT(arcstat_sys_free) /* target system free bytes */
 
+#define	arc_anon	(&ARC_anon)
+#define	arc_mru		(&ARC_mru)
+#define	arc_mru_ghost	(&ARC_mru_ghost)
+#define	arc_mfu		(&ARC_mfu)
+#define	arc_mfu_ghost	(&ARC_mfu_ghost)
+#define	arc_l2c_only	(&ARC_l2c_only)
+
 extern taskq_t *arc_prune_taskq;
 extern arc_stats_t arc_stats;
 extern arc_sums_t arc_sums;
@@ -974,9 +981,9 @@ extern int arc_no_grow_shift;
 extern int arc_shrink_shift;
 extern kmutex_t arc_prune_mtx;
 extern list_t arc_prune_list;
+extern arc_state_t	ARC_mfu;
+extern arc_state_t	ARC_mru;
 extern aggsum_t arc_size;
-extern arc_state_t	*arc_mfu;
-extern arc_state_t	*arc_mru;
 extern uint_t zfs_arc_pc_percent;
 extern int arc_lotsfree_percent;
 extern uint64_t zfs_arc_min;
@@ -985,8 +992,7 @@ extern uint64_t zfs_arc_max;
 extern void arc_reduce_target_size(int64_t to_free);
 extern boolean_t arc_reclaim_needed(void);
 extern void arc_kmem_reap_soon(void);
-extern boolean_t arc_is_overflowing(void);
-extern void arc_wait_for_eviction(uint64_t);
+extern void arc_wait_for_eviction(uint64_t, boolean_t);
 
 extern void arc_lowmem_init(void);
 extern void arc_lowmem_fini(void);
@@ -1000,6 +1006,8 @@ extern void arc_unregister_hotplug(void);
 
 extern int param_set_arc_long(ZFS_MODULE_PARAM_ARGS);
 extern int param_set_arc_int(ZFS_MODULE_PARAM_ARGS);
+extern int param_set_arc_min(ZFS_MODULE_PARAM_ARGS);
+extern int param_set_arc_max(ZFS_MODULE_PARAM_ARGS);
 
 /* used in zdb.c */
 boolean_t l2arc_log_blkptr_valid(l2arc_dev_t *dev,

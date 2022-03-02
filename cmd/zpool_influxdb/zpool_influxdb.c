@@ -118,6 +118,7 @@ escape_string(const char *s)
 		case '=':
 		case '\\':
 			*d++ = '\\';
+			zfs_fallthrough;
 		default:
 			*d = *c;
 		}
@@ -410,6 +411,7 @@ print_vdev_latency_stats(nvlist_t *nvroot, const char *pool_name,
 #ifdef ZPOOL_CONFIG_VDEV_TRIM_LAT_HISTO
 	    {ZPOOL_CONFIG_VDEV_TRIM_LAT_HISTO,    "trim", 0},
 #endif
+	    {ZPOOL_CONFIG_VDEV_REBUILD_LAT_HISTO,    "rebuild", 0},
 	    {NULL,	NULL}
 	};
 
@@ -505,6 +507,8 @@ print_vdev_size_stats(nvlist_t *nvroot, const char *pool_name,
 	    {ZPOOL_CONFIG_VDEV_IND_TRIM_HISTO,    "trim_write_ind"},
 	    {ZPOOL_CONFIG_VDEV_AGG_TRIM_HISTO,    "trim_write_agg"},
 #endif
+	    {ZPOOL_CONFIG_VDEV_IND_REBUILD_HISTO,    "rebuild_write_ind"},
+	    {ZPOOL_CONFIG_VDEV_AGG_REBUILD_HISTO,    "rebuild_write_agg"},
 	    {NULL,	NULL}
 	};
 
@@ -584,11 +588,13 @@ print_queue_stats(nvlist_t *nvroot, const char *pool_name,
 	    {ZPOOL_CONFIG_VDEV_ASYNC_R_ACTIVE_QUEUE,	"async_r_active"},
 	    {ZPOOL_CONFIG_VDEV_ASYNC_W_ACTIVE_QUEUE,	"async_w_active"},
 	    {ZPOOL_CONFIG_VDEV_SCRUB_ACTIVE_QUEUE,	"async_scrub_active"},
+	    {ZPOOL_CONFIG_VDEV_REBUILD_ACTIVE_QUEUE,	"rebuild_active"},
 	    {ZPOOL_CONFIG_VDEV_SYNC_R_PEND_QUEUE,	"sync_r_pend"},
 	    {ZPOOL_CONFIG_VDEV_SYNC_W_PEND_QUEUE,	"sync_w_pend"},
 	    {ZPOOL_CONFIG_VDEV_ASYNC_R_PEND_QUEUE,	"async_r_pend"},
 	    {ZPOOL_CONFIG_VDEV_ASYNC_W_PEND_QUEUE,	"async_w_pend"},
 	    {ZPOOL_CONFIG_VDEV_SCRUB_PEND_QUEUE,	"async_scrub_pend"},
+	    {ZPOOL_CONFIG_VDEV_REBUILD_PEND_QUEUE,	"rebuild_pend"},
 	    {NULL,	NULL}
 	};
 
@@ -635,11 +641,13 @@ print_top_level_vdev_stats(nvlist_t *nvroot, const char *pool_name)
 	    {ZPOOL_CONFIG_VDEV_ASYNC_R_ACTIVE_QUEUE, "async_r_active_queue"},
 	    {ZPOOL_CONFIG_VDEV_ASYNC_W_ACTIVE_QUEUE, "async_w_active_queue"},
 	    {ZPOOL_CONFIG_VDEV_SCRUB_ACTIVE_QUEUE, "async_scrub_active_queue"},
+	    {ZPOOL_CONFIG_VDEV_REBUILD_ACTIVE_QUEUE, "rebuild_active_queue"},
 	    {ZPOOL_CONFIG_VDEV_SYNC_R_PEND_QUEUE, "sync_r_pend_queue"},
 	    {ZPOOL_CONFIG_VDEV_SYNC_W_PEND_QUEUE, "sync_w_pend_queue"},
 	    {ZPOOL_CONFIG_VDEV_ASYNC_R_PEND_QUEUE, "async_r_pend_queue"},
 	    {ZPOOL_CONFIG_VDEV_ASYNC_W_PEND_QUEUE, "async_w_pend_queue"},
 	    {ZPOOL_CONFIG_VDEV_SCRUB_PEND_QUEUE, "async_scrub_pend_queue"},
+	    {ZPOOL_CONFIG_VDEV_REBUILD_PEND_QUEUE, "rebuild_pend_queue"},
 	    {NULL, NULL}
 	};
 
@@ -684,9 +692,8 @@ print_recursive_stats(stat_printer_f func, nvlist_t *nvroot,
 
 	if (descend && nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_CHILDREN,
 	    &child, &children) == 0) {
-		(void) strncpy(vdev_name, get_vdev_name(nvroot, parent_name),
+		(void) strlcpy(vdev_name, get_vdev_name(nvroot, parent_name),
 		    sizeof (vdev_name));
-		vdev_name[sizeof (vdev_name) - 1] = '\0';
 
 		for (c = 0; c < children; c++) {
 			print_recursive_stats(func, child[c], pool_name,
@@ -811,7 +818,7 @@ main(int argc, char *argv[])
 			break;
 		case 't':
 			tagslen = strlen(optarg) + 2;
-			tags = calloc(tagslen, 1);
+			tags = calloc(1, tagslen);
 			if (tags == NULL) {
 				fprintf(stderr,
 				    "error: cannot allocate memory "

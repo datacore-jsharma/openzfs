@@ -41,6 +41,7 @@
 #include <libzutil.h>
 #include <libzfs.h>
 #include <string.h>
+#include <libgen.h>
 
 #include "zfs_agents.h"
 #include "fmd_api.h"
@@ -238,7 +239,7 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
 			    ZPOOL_CONFIG_ASHIFT, ashift);
 
 		(void) nvlist_add_nvlist_array(replacement,
-		    ZPOOL_CONFIG_CHILDREN, &spares[s], 1);
+		    ZPOOL_CONFIG_CHILDREN, (const nvlist_t **)&spares[s], 1);
 
 		fmd_hdl_debug(hdl, "zpool_vdev_replace '%s' with spare '%s'",
 		    dev_name, zfs_basename(spare_name));
@@ -262,7 +263,6 @@ replace_with_spare(fmd_hdl_t *hdl, zpool_handle_t *zhp, nvlist_t *vdev)
  * ASRU is now usable.  ZFS has found the device to be present and
  * functioning.
  */
-/*ARGSUSED*/
 static void
 zfs_vdev_repair(fmd_hdl_t *hdl, nvlist_t *nvl)
 {
@@ -301,11 +301,11 @@ zfs_vdev_repair(fmd_hdl_t *hdl, nvlist_t *nvl)
 	    vdev_guid, pool_guid);
 }
 
-/*ARGSUSED*/
 static void
 zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
     const char *class)
 {
+	(void) ep;
 	uint64_t pool_guid, vdev_guid;
 	zpool_handle_t *zhp;
 	nvlist_t *resource, *fault;

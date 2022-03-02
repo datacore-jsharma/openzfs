@@ -121,8 +121,6 @@
  * dsl_dir_init_fs_ss_count().
  */
 
-extern inline dsl_dir_phys_t *dsl_dir_phys(dsl_dir_t *dd);
-
 static uint64_t dsl_dir_space_towrite(dsl_dir_t *dd);
 
 typedef struct ddulrt_arg {
@@ -764,6 +762,8 @@ dsl_enforce_ds_ss_limits(dsl_dir_t *dd, zfs_prop_t prop,
 	 */
 	if (secpolicy_zfs_proc(cr, proc) == 0)
 		return (ENFORCE_NEVER);
+#else
+	(void) proc;
 #endif
 
 	if ((obj = dsl_dir_phys(dd)->dd_head_dataset_obj) == 0)
@@ -1320,7 +1320,6 @@ top_of_function:
 	 * we're very close to full, this will allow a steady trickle of
 	 * removes to get through.
 	 */
-	uint64_t deferred = 0;
 	if (dd->dd_parent == NULL) {
 		uint64_t avail = dsl_pool_unreserved_space(dd->dd_pool,
 		    (netfree) ?
@@ -1340,7 +1339,7 @@ top_of_function:
 	 */
 	if (used_on_disk + est_inflight >= quota) {
 		if (est_inflight > 0 || used_on_disk < quota ||
-		    (retval == ENOSPC && used_on_disk < quota + deferred))
+		    (retval == ENOSPC && used_on_disk < quota))
 			retval = ERESTART;
 		dprintf_dd(dd, "failing: used=%lluK inflight = %lluK "
 		    "quota=%lluK tr=%lluK err=%d\n",
@@ -1517,6 +1516,11 @@ dsl_dir_diduse_space(dsl_dir_t *dd, dd_used_t type,
 {
 	int64_t accounted_delta;
 
+	ASSERT(dmu_tx_is_syncing(tx));
+	ASSERT(type < DD_USED_NUM);
+
+	dmu_buf_will_dirty(dd->dd_dbuf, tx);
+
 	/*
 	 * dsl_dataset_set_refreservation_sync_impl() calls this with
 	 * dd_lock held, so that it can atomically update
@@ -1525,36 +1529,28 @@ dsl_dir_diduse_space(dsl_dir_t *dd, dd_used_t type,
 	 * consistently.
 	 */
 	boolean_t needlock = !MUTEX_HELD(&dd->dd_lock);
-
-	ASSERT(dmu_tx_is_syncing(tx));
-	ASSERT(type < DD_USED_NUM);
-
-	dmu_buf_will_dirty(dd->dd_dbuf, tx);
-
 	if (needlock)
 		mutex_enter(&dd->dd_lock);
-	accounted_delta =
-	    parent_delta(dd, dsl_dir_phys(dd)->dd_used_bytes, used);
-	ASSERT(used >= 0 || dsl_dir_phys(dd)->dd_used_bytes >= -used);
-	ASSERT(compressed >= 0 ||
-	    dsl_dir_phys(dd)->dd_compressed_bytes >= -compressed);
+	dsl_dir_phys_t *ddp = dsl_dir_phys(dd);
+	accounted_delta = parent_delta(dd, ddp->dd_used_bytes, used);
+	ASSERT(used >= 0 || ddp->dd_used_bytes >= -used);
+	ASSERT(compressed >= 0 || ddp->dd_compressed_bytes >= -compressed);
 	ASSERT(uncompressed >= 0 ||
-	    dsl_dir_phys(dd)->dd_uncompressed_bytes >= -uncompressed);
-	dsl_dir_phys(dd)->dd_used_bytes += used;
-	dsl_dir_phys(dd)->dd_uncompressed_bytes += uncompressed;
-	dsl_dir_phys(dd)->dd_compressed_bytes += compressed;
+	    ddp->dd_uncompressed_bytes >= -uncompressed);
+	ddp->dd_used_bytes += used;
+	ddp->dd_uncompressed_bytes += uncompressed;
+	ddp->dd_compressed_bytes += compressed;
 
-	if (dsl_dir_phys(dd)->dd_flags & DD_FLAG_USED_BREAKDOWN) {
-		ASSERT(used > 0 ||
-		    dsl_dir_phys(dd)->dd_used_breakdown[type] >= -used);
-		dsl_dir_phys(dd)->dd_used_breakdown[type] += used;
+	if (ddp->dd_flags & DD_FLAG_USED_BREAKDOWN) {
+		ASSERT(used >= 0 || ddp->dd_used_breakdown[type] >= -used);
+		ddp->dd_used_breakdown[type] += used;
 #ifdef ZFS_DEBUG
 		{
 			dd_used_t t;
 			uint64_t u = 0;
 			for (t = 0; t < DD_USED_NUM; t++)
-				u += dsl_dir_phys(dd)->dd_used_breakdown[t];
-			ASSERT3U(u, ==, dsl_dir_phys(dd)->dd_used_bytes);
+				u += ddp->dd_used_breakdown[t];
+			ASSERT3U(u, ==, ddp->dd_used_bytes);
 		}
 #endif
 	}
@@ -1562,11 +1558,9 @@ dsl_dir_diduse_space(dsl_dir_t *dd, dd_used_t type,
 		mutex_exit(&dd->dd_lock);
 
 	if (dd->dd_parent != NULL) {
-		dsl_dir_diduse_space(dd->dd_parent, DD_USED_CHILD,
-		    accounted_delta, compressed, uncompressed, tx);
-		dsl_dir_transfer_space(dd->dd_parent,
-		    used - accounted_delta,
-		    DD_USED_CHILD_RSRV, DD_USED_CHILD, tx);
+		dsl_dir_diduse_transfer_space(dd->dd_parent,
+		    accounted_delta, compressed, uncompressed,
+		    used, DD_USED_CHILD_RSRV, DD_USED_CHILD, tx);
 	}
 }
 
@@ -1578,19 +1572,70 @@ dsl_dir_transfer_space(dsl_dir_t *dd, int64_t delta,
 	ASSERT(oldtype < DD_USED_NUM);
 	ASSERT(newtype < DD_USED_NUM);
 
+	dsl_dir_phys_t *ddp = dsl_dir_phys(dd);
 	if (delta == 0 ||
-	    !(dsl_dir_phys(dd)->dd_flags & DD_FLAG_USED_BREAKDOWN))
+	    !(ddp->dd_flags & DD_FLAG_USED_BREAKDOWN))
 		return;
 
 	dmu_buf_will_dirty(dd->dd_dbuf, tx);
 	mutex_enter(&dd->dd_lock);
 	ASSERT(delta > 0 ?
-	    dsl_dir_phys(dd)->dd_used_breakdown[oldtype] >= delta :
-	    dsl_dir_phys(dd)->dd_used_breakdown[newtype] >= -delta);
-	ASSERT(dsl_dir_phys(dd)->dd_used_bytes >= ABS(delta));
-	dsl_dir_phys(dd)->dd_used_breakdown[oldtype] -= delta;
-	dsl_dir_phys(dd)->dd_used_breakdown[newtype] += delta;
+	    ddp->dd_used_breakdown[oldtype] >= delta :
+	    ddp->dd_used_breakdown[newtype] >= -delta);
+	ASSERT(ddp->dd_used_bytes >= ABS(delta));
+	ddp->dd_used_breakdown[oldtype] -= delta;
+	ddp->dd_used_breakdown[newtype] += delta;
 	mutex_exit(&dd->dd_lock);
+}
+
+void
+dsl_dir_diduse_transfer_space(dsl_dir_t *dd, int64_t used,
+    int64_t compressed, int64_t uncompressed, int64_t tonew,
+    dd_used_t oldtype, dd_used_t newtype, dmu_tx_t *tx)
+{
+	int64_t accounted_delta;
+
+	ASSERT(dmu_tx_is_syncing(tx));
+	ASSERT(oldtype < DD_USED_NUM);
+	ASSERT(newtype < DD_USED_NUM);
+
+	dmu_buf_will_dirty(dd->dd_dbuf, tx);
+
+	mutex_enter(&dd->dd_lock);
+	dsl_dir_phys_t *ddp = dsl_dir_phys(dd);
+	accounted_delta = parent_delta(dd, ddp->dd_used_bytes, used);
+	ASSERT(used >= 0 || ddp->dd_used_bytes >= -used);
+	ASSERT(compressed >= 0 || ddp->dd_compressed_bytes >= -compressed);
+	ASSERT(uncompressed >= 0 ||
+	    ddp->dd_uncompressed_bytes >= -uncompressed);
+	ddp->dd_used_bytes += used;
+	ddp->dd_uncompressed_bytes += uncompressed;
+	ddp->dd_compressed_bytes += compressed;
+
+	if (ddp->dd_flags & DD_FLAG_USED_BREAKDOWN) {
+		ASSERT(tonew - used <= 0 ||
+		    ddp->dd_used_breakdown[oldtype] >= tonew - used);
+		ASSERT(tonew >= 0 ||
+		    ddp->dd_used_breakdown[newtype] >= -tonew);
+		ddp->dd_used_breakdown[oldtype] -= tonew - used;
+		ddp->dd_used_breakdown[newtype] += tonew;
+#ifdef ZFS_DEBUG
+		{
+			dd_used_t t;
+			uint64_t u = 0;
+			for (t = 0; t < DD_USED_NUM; t++)
+				u += ddp->dd_used_breakdown[t];
+			ASSERT3U(u, ==, ddp->dd_used_bytes);
+		}
+#endif
+	}
+	mutex_exit(&dd->dd_lock);
+
+	if (dd->dd_parent != NULL) {
+		dsl_dir_diduse_transfer_space(dd->dd_parent,
+		    accounted_delta, compressed, uncompressed,
+		    used, DD_USED_CHILD_RSRV, DD_USED_CHILD, tx);
+	}
 }
 
 typedef struct dsl_dir_set_qr_arg {
@@ -1850,10 +1895,10 @@ typedef struct dsl_valid_rename_arg {
 	int nest_delta;
 } dsl_valid_rename_arg_t;
 
-/* ARGSUSED */
 static int
 dsl_valid_rename(dsl_pool_t *dp, dsl_dataset_t *ds, void *arg)
 {
+	(void) dp;
 	dsl_valid_rename_arg_t *dvra = arg;
 	char namebuf[ZFS_MAX_DATASET_NAME_LEN];
 
@@ -2350,6 +2395,7 @@ dsl_dir_activity_in_progress(dsl_dir_t *dd, dsl_dataset_t *ds,
 		 * The delete queue is ZPL specific, and libzpool doesn't have
 		 * it. It doesn't make sense to wait for it.
 		 */
+		(void) ds;
 		*in_progress = B_FALSE;
 		break;
 #endif

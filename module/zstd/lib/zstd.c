@@ -279,12 +279,9 @@ intptr_t __msan_test_shadow(const volatile void *x, size_t size);
 #endif
 
 /* detects whether we are being compiled under asan */
-#if defined (__has_feature)
-#  if __has_feature(address_sanitizer)
-#    define ADDRESS_SANITIZER 1
-#  endif
-#elif defined(__SANITIZE_ADDRESS__)
+#if defined (ZFS_ASAN_ENABLED)
 #  define ADDRESS_SANITIZER 1
+#  define ZSTD_ASAN_DONT_POISON_WORKSPACE
 #endif
 
 #if defined (ADDRESS_SANITIZER)
@@ -6340,7 +6337,6 @@ extern "C" {
 
 /* ---- static assert (debug) --- */
 #define ZSTD_STATIC_ASSERT(c) DEBUG_STATIC_ASSERT(c)
-#define ZSTD_isError ERR_isError   /* for inlining */
 #define FSE_isError  ERR_isError
 #define HUF_isError  ERR_isError
 
@@ -7347,7 +7343,6 @@ const char* ZSTD_versionString(void) { return ZSTD_VERSION_STRING; }
 /*-****************************************
 *  ZSTD Error Management
 ******************************************/
-#undef ZSTD_isError   /* defined within zstd_internal.h */
 /*! ZSTD_isError() :
  *  tells if a return value is an error code
  *  symbol is required for external callers */

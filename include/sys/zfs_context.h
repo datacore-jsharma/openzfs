@@ -41,7 +41,6 @@ extern "C" {
  * similar environment.
  */
 #if defined(__KERNEL__) || defined(_STANDALONE)
-#include <sys/note.h>
 #include <sys/types.h>
 #include <sys/atomic.h>
 #include <sys/sysmacros.h>
@@ -104,7 +103,6 @@ extern "C" {
 #include <ctype.h>
 #include <signal.h>
 #include <sys/mman.h>
-#include <sys/note.h>
 #include <sys/types.h>
 #include <sys/cred.h>
 #include <sys/sysmacros.h>
@@ -494,7 +492,7 @@ extern taskq_t	*taskq_create(const char *, int, pri_t, int, int, uint_t);
 #define	taskq_create_proc(a, b, c, d, e, p, f) \
 	    (taskq_create(a, b, c, d, e, f))
 #define	taskq_create_sysdc(a, b, d, e, p, dc, f) \
-	    (taskq_create(a, b, maxclsyspri, d, e, f))
+	    ((void) sizeof (dc), taskq_create(a, b, maxclsyspri, d, e, f))
 extern taskqid_t taskq_dispatch(taskq_t *, task_func_t, void *, uint_t);
 extern taskqid_t taskq_dispatch_delay(taskq_t *, task_func_t, void *, uint_t,
     clock_t);
@@ -511,6 +509,7 @@ extern taskq_t	*taskq_of_curthread(void);
 extern int	taskq_cancel_id(taskq_t *, taskqid_t);
 extern void	system_taskq_init(void);
 extern void	system_taskq_fini(void);
+extern boolean_t taskq_empty(taskq_t *);
 
 #define	XVA_MAPSIZE	3
 #define	XVA_MAGIC	0x78766174
@@ -768,7 +767,6 @@ extern void spl_fstrans_unmark(fstrans_cookie_t);
 extern int __spl_pf_fstrans_check(void);
 extern int kmem_cache_reap_active(void);
 
-#define	____cacheline_aligned
 
 /*
  * Kernel modules

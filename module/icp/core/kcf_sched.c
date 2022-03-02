@@ -35,15 +35,12 @@
 #include <sys/crypto/sched_impl.h>
 #include <sys/crypto/api.h>
 
-kcf_global_swq_t *gswq;	/* Global software queue */
+static kcf_global_swq_t *gswq;	/* Global software queue */
 
 /* Thread pool related variables */
 static kcf_pool_t *kcfpool;	/* Thread pool of kcfd LWPs */
-int kcf_maxthreads = 2;
-int kcf_minthreads = 1;
-int kcf_thr_multiple = 2;	/* Boot-time tunable for experimentation */
-static ulong_t	kcf_idlethr_timeout;
-#define	KCF_DEFAULT_THRTIMEOUT	60000000	/* 60 seconds */
+static const int kcf_maxthreads = 2;
+static const int kcf_minthreads = 1;
 
 /* kmem caches used by the scheduler */
 static kmem_cache_t *kcf_sreq_cache;
@@ -616,7 +613,7 @@ kcf_submit_request(kcf_provider_desc_t *pd, crypto_ctx_t *ctx,
 			 * request allocation and call the SPI directly.
 			 */
 			if ((pd->pd_flags & CRYPTO_SYNCHRONOUS) &&
-			    EMPTY_TASKQ(taskq)) {
+			    taskq_empty(taskq)) {
 				KCF_PROV_IREFHOLD(pd);
 				if (pd->pd_state == KCF_PROV_READY) {
 					error = common_submit_request(pd, ctx,
@@ -651,7 +648,7 @@ kcf_submit_request(kcf_provider_desc_t *pd, crypto_ctx_t *ctx,
 			 * case. This is unlike the asynchronous case where we
 			 * must always dispatch to the taskq.
 			 */
-			if (EMPTY_TASKQ(taskq) &&
+			if (taskq_empty(taskq) &&
 			    pd->pd_state == KCF_PROV_READY) {
 				process_req_hwp(sreq);
 			} else {
@@ -961,10 +958,10 @@ kcf_enqueue(kcf_areq_node_t *node)
 /*
  * kmem_cache_alloc constructor for sync request structure.
  */
-/* ARGSUSED */
 static int
 kcf_sreq_cache_constructor(void *buf, void *cdrarg, int kmflags)
 {
+	(void) cdrarg, (void) kmflags;
 	kcf_sreq_node_t *sreq = (kcf_sreq_node_t *)buf;
 
 	sreq->sn_type = CRYPTO_SYNCH;
@@ -974,10 +971,10 @@ kcf_sreq_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	return (0);
 }
 
-/* ARGSUSED */
 static void
 kcf_sreq_cache_destructor(void *buf, void *cdrarg)
 {
+	(void) cdrarg;
 	kcf_sreq_node_t *sreq = (kcf_sreq_node_t *)buf;
 
 	mutex_destroy(&sreq->sn_lock);
@@ -987,10 +984,10 @@ kcf_sreq_cache_destructor(void *buf, void *cdrarg)
 /*
  * kmem_cache_alloc constructor for async request structure.
  */
-/* ARGSUSED */
 static int
 kcf_areq_cache_constructor(void *buf, void *cdrarg, int kmflags)
 {
+	(void) cdrarg, (void) kmflags;
 	kcf_areq_node_t *areq = (kcf_areq_node_t *)buf;
 
 	areq->an_type = CRYPTO_ASYNCH;
@@ -1002,10 +999,10 @@ kcf_areq_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	return (0);
 }
 
-/* ARGSUSED */
 static void
 kcf_areq_cache_destructor(void *buf, void *cdrarg)
 {
+	(void) cdrarg;
 	kcf_areq_node_t *areq = (kcf_areq_node_t *)buf;
 
 	ASSERT(areq->an_refcnt == 0);
@@ -1017,10 +1014,10 @@ kcf_areq_cache_destructor(void *buf, void *cdrarg)
 /*
  * kmem_cache_alloc constructor for kcf_context structure.
  */
-/* ARGSUSED */
 static int
 kcf_context_cache_constructor(void *buf, void *cdrarg, int kmflags)
 {
+	(void) cdrarg, (void) kmflags;
 	kcf_context_t *kctx = (kcf_context_t *)buf;
 
 	kctx->kc_refcnt = 0;
@@ -1029,10 +1026,10 @@ kcf_context_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	return (0);
 }
 
-/* ARGSUSED */
 static void
 kcf_context_cache_destructor(void *buf, void *cdrarg)
 {
+	(void) cdrarg;
 	kcf_context_t *kctx = (kcf_context_t *)buf;
 
 	ASSERT(kctx->kc_refcnt == 0);
@@ -1280,8 +1277,6 @@ kcfpool_alloc()
 
 	mutex_init(&kcfpool->kp_user_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&kcfpool->kp_user_cv, NULL, CV_DEFAULT, NULL);
-
-	kcf_idlethr_timeout = KCF_DEFAULT_THRTIMEOUT;
 }
 
 /*

@@ -33,12 +33,15 @@
 #include <sys/zfs_vfsops.h>
 #include <sys/zfs_vnops.h>
 #include <sys/zfs_project.h>
+#ifdef HAVE_VFS_SET_PAGE_DIRTY_NOBUFFERS
+#include <linux/pagemap.h>
+#endif
 
 /*
  * When using fallocate(2) to preallocate space, inflate the requested
  * capacity check by 10% to account for the required metadata blocks.
  */
-unsigned int zfs_fallocate_reserve_percent = 110;
+static unsigned int zfs_fallocate_reserve_percent = 110;
 
 static int
 zpl_open(struct inode *ip, struct file *filp)
@@ -248,9 +251,15 @@ zpl_uio_init(zfs_uio_t *uio, struct kiocb *kiocb, struct iov_iter *to,
 #if defined(HAVE_VFS_IOV_ITER)
 	zfs_uio_iov_iter_init(uio, to, pos, count, skip);
 #else
+#ifdef HAVE_IOV_ITER_TYPE
+	zfs_uio_iovec_init(uio, to->iov, to->nr_segs, pos,
+	    iov_iter_type(to) & ITER_KVEC ? UIO_SYSSPACE : UIO_USERSPACE,
+	    count, skip);
+#else
 	zfs_uio_iovec_init(uio, to->iov, to->nr_segs, pos,
 	    to->type & ITER_KVEC ? UIO_SYSSPACE : UIO_USERSPACE,
 	    count, skip);
+#endif
 #endif
 }
 
@@ -591,8 +600,8 @@ zpl_mmap(struct file *filp, struct vm_area_struct *vma)
  * only used to support mmap(2).  There will be an identical copy of the
  * data in the ARC which is kept up to date via .write() and .writepage().
  */
-static int
-zpl_readpage(struct file *filp, struct page *pp)
+static inline int
+zpl_readpage_common(struct page *pp)
 {
 	struct inode *ip;
 	struct page *pl[1];
@@ -620,6 +629,18 @@ zpl_readpage(struct file *filp, struct page *pp)
 	return (error);
 }
 
+static int
+zpl_readpage(struct file *filp, struct page *pp)
+{
+	return (zpl_readpage_common(pp));
+}
+
+static int
+zpl_readpage_filler(void *data, struct page *pp)
+{
+	return (zpl_readpage_common(pp));
+}
+
 /*
  * Populate a set of pages with data for the Linux page cache.  This
  * function will only be called for read ahead and never for demand
@@ -630,8 +651,7 @@ static int
 zpl_readpages(struct file *filp, struct address_space *mapping,
     struct list_head *pages, unsigned nr_pages)
 {
-	return (read_cache_pages(mapping, pages,
-	    (filler_t *)zpl_readpage, filp));
+	return (read_cache_pages(mapping, pages, zpl_readpage_filler, NULL));
 }
 
 static int
@@ -725,7 +745,12 @@ zpl_fallocate_common(struct inode *ip, int mode, loff_t offset, loff_t len)
 	fstrans_cookie_t cookie;
 	int error = 0;
 
-	if ((mode & ~(FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE)) != 0)
+	int test_mode = FALLOC_FL_PUNCH_HOLE;
+#ifdef HAVE_FALLOC_FL_ZERO_RANGE
+	test_mode |= FALLOC_FL_ZERO_RANGE;
+#endif
+
+	if ((mode & ~(FALLOC_FL_KEEP_SIZE | test_mode)) != 0)
 		return (-EOPNOTSUPP);
 
 	if (offset < 0 || len <= 0)
@@ -736,7 +761,7 @@ zpl_fallocate_common(struct inode *ip, int mode, loff_t offset, loff_t len)
 
 	crhold(cr);
 	cookie = spl_fstrans_mark();
-	if (mode & FALLOC_FL_PUNCH_HOLE) {
+	if (mode & (test_mode)) {
 		flock64_t bf;
 
 		if (offset > olen)
@@ -795,6 +820,14 @@ zpl_fallocate(struct file *filp, int mode, loff_t offset, loff_t len)
 {
 	return zpl_fallocate_common(file_inode(filp),
 	    mode, offset, len);
+}
+
+static int
+zpl_ioctl_getversion(struct file *filp, void __user *arg)
+{
+	uint32_t generation = file_inode(filp)->i_generation;
+
+	return (copy_to_user(arg, &generation, sizeof (generation)));
 }
 
 #define	ZFS_FL_USER_VISIBLE	(FS_FL_USER_VISIBLE | ZFS_PROJINHERIT_FL)
@@ -969,6 +1002,8 @@ static long
 zpl_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	switch (cmd) {
+	case FS_IOC_GETVERSION:
+		return (zpl_ioctl_getversion(filp, (void *)arg));
 	case FS_IOC_GETFLAGS:
 		return (zpl_ioctl_getflags(filp, (void *)arg));
 	case FS_IOC_SETFLAGS:
@@ -987,6 +1022,9 @@ static long
 zpl_compat_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	switch (cmd) {
+	case FS_IOC32_GETVERSION:
+		cmd = FS_IOC_GETVERSION;
+		break;
 	case FS_IOC32_GETFLAGS:
 		cmd = FS_IOC_GETFLAGS;
 		break;
@@ -1007,6 +1045,9 @@ const struct address_space_operations zpl_address_space_operations = {
 	.writepage	= zpl_writepage,
 	.writepages	= zpl_writepages,
 	.direct_IO	= zpl_direct_IO,
+#ifdef HAVE_VFS_SET_PAGE_DIRTY_NOBUFFERS
+	.set_page_dirty = __set_page_dirty_nobuffers,
+#endif
 };
 
 const struct file_operations zpl_file_operations = {
@@ -1059,8 +1100,7 @@ const struct file_operations zpl_dir_file_operations = {
 #endif
 };
 
-/* BEGIN CSTYLED */
+/* CSTYLED */
 module_param(zfs_fallocate_reserve_percent, uint, 0644);
 MODULE_PARM_DESC(zfs_fallocate_reserve_percent,
-    "Percentage of length to use for the available capacity check");
-/* END CSTYLED */
+	"Percentage of length to use for the available capacity check");

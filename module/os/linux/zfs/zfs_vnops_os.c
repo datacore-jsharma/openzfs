@@ -320,7 +320,7 @@ mappedread(znode_t *zp, int nbytes, zfs_uio_t *uio)
 }
 #endif /* _KERNEL */
 
-unsigned long zfs_delete_blocks = DMU_MAX_DELETEBLKCNT;
+static unsigned long zfs_delete_blocks = DMU_MAX_DELETEBLKCNT;
 
 /*
  * Write the bytes to a file.
@@ -367,6 +367,12 @@ zfs_write_simple(znode_t *zp, const void *data, size_t len,
 	return (error);
 }
 
+static void
+zfs_rele_async_task(void *arg)
+{
+	iput(arg);
+}
+
 void
 zfs_zrele_async(znode_t *zp)
 {
@@ -386,7 +392,7 @@ zfs_zrele_async(znode_t *zp)
 	 */
 	if (!atomic_add_unless(&ip->i_count, -1, 1)) {
 		VERIFY(taskq_dispatch(dsl_pool_zrele_taskq(dmu_objset_pool(os)),
-		    (task_func_t *)iput, ip, TQ_SLEEP) != TASKQID_INVALID);
+		    zfs_rele_async_task, ip, TQ_SLEEP) != TASKQID_INVALID);
 	}
 }
 
@@ -3525,7 +3531,11 @@ zfs_putpage(struct inode *ip, struct page *pp, struct writeback_control *wbc)
 
 		if (wbc->sync_mode != WB_SYNC_NONE) {
 			if (PageWriteback(pp))
+#ifdef HAVE_PAGEMAP_FOLIO_WAIT_BIT
+				folio_wait_bit(page_folio(pp), PG_writeback);
+#else
 				wait_on_page_bit(pp, PG_writeback);
+#endif
 		}
 
 		ZFS_EXIT(zfsvfs);
@@ -3599,6 +3609,8 @@ zfs_putpage(struct inode *ip, struct page *pp, struct writeback_control *wbc)
 		 */
 		zil_commit(zfsvfs->z_log, zp->z_id);
 	}
+
+	dataset_kstats_update_write_kstats(&zfsvfs->z_kstat, pglen);
 
 	ZFS_EXIT(zfsvfs);
 	return (err);
@@ -3795,6 +3807,8 @@ zfs_getpage(struct inode *ip, struct page *pl[], int nr_pages)
 
 	err = zfs_fillpage(ip, pl, nr_pages);
 
+	dataset_kstats_update_read_kstats(&zfsvfs->z_kstat, nr_pages*PAGESIZE);
+
 	ZFS_EXIT(zfsvfs);
 	return (err);
 }
@@ -3985,9 +3999,8 @@ EXPORT_SYMBOL(zfs_putpage);
 EXPORT_SYMBOL(zfs_dirty_inode);
 EXPORT_SYMBOL(zfs_map);
 
-/* BEGIN CSTYLED */
+/* CSTYLED */
 module_param(zfs_delete_blocks, ulong, 0644);
 MODULE_PARM_DESC(zfs_delete_blocks, "Delete files larger than N blocks async");
-/* END CSTYLED */
 
 #endif
