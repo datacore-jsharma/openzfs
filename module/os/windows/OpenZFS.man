@@ -14,14 +14,14 @@
 		>
 			<provider
 				callback            = "custom"
-				applicationIdentity = "OpenZFS.sys"
+				applicationIdentity = "ZFSin.sys"
 				providerType        = "kernelMode"
-				providerName        = "OpenZFS"
+				providerName        = "ZFSin"
 				providerGuid        = "{F1EAE04E-8717-4578-A3C5-3FAE3BADDBCB}"
 			>
 				<counterSet
 					guid        = "{11B6CA09-A1C6-44B9-AAB6-73BE315FD799}"
-					uri         = "OpenZFS.IOPS.THROUGHPUT"
+					uri         = "ZFSin.IOPS.THROUGHPUT"
 					name        = "OpenZFS Zpool"
 					description = "Collect IOPS, read and written bytes of a zpool"
 					symbol      = "ZFSinPerf"
