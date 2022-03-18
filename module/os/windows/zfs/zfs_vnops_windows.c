@@ -4660,6 +4660,10 @@ _Function_class_(DRIVER_DISPATCH)
 				Status = zpool_get_size_stats(DeviceObject,
 				    Irp, IrpSp);
 				break;
+			case ZPOOL_GET_IOPS_THRPUT_STATS:
+			    dprintf("ZPOOL_GET_IOPS_THRPUT_STATS\n");
+			    Status = zpool_get_iops_thrput(DeviceObject, Irp, IrpSp);
+			    break;
 			default:
 				dprintf("**** unknown Windows IOCTL: 0x%lx\n",
 				    cmd);
